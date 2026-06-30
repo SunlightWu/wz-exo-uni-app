@@ -1,0 +1,73 @@
+// styles/_variables.scss
+// 全局 SCSS 变量 & Mixins — 所有页面通过 @import "./styles/variables" 引用
+// CSS 自定义属性定义在 App.vue <style> 中，此文件提供 SCSS 层的便捷映射
+
+// ── 颜色映射 ──
+$bg:             var(--color-bg);
+$primary:        var(--color-primary);
+$text-main:      var(--color-text-main);
+$text-sub:       var(--color-text-sub);
+$card:           var(--color-card);
+$card-soft:      var(--color-card-soft);
+$border:         var(--color-border);
+$success:        var(--color-success);
+$warning:        var(--color-warning);
+$danger:         var(--color-danger);
+$stats-bg:       var(--color-stats-bg);
+
+// ── 圆角 ──
+$radius-sm:  var(--radius-sm);
+$radius-md:  var(--radius-md);
+$radius-lg:  var(--radius-lg);
+$radius-xl:  var(--radius-xl);
+$radius-full: var(--radius-full);
+
+// ── Mixins ──
+@mixin page-base {
+  min-height: 100vh;
+  background: $bg;
+  padding-bottom: 40px;
+}
+@mixin card-base {
+  background: $card;
+  border-radius: $radius-xl;
+  border: 1.4px solid $border;
+  overflow: hidden;
+}
+@mixin flex-row($gap: 12px) {
+  display: flex;
+  align-items: center;
+  gap: $gap;
+}
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+@mixin text-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: $text-main;
+}
+@mixin text-body {
+  font-size: 14px;
+  color: $text-main;
+}
+@mixin text-caption {
+  font-size: 12px;
+  color: $text-sub;
+}
+@mixin tap-active {
+  transition: opacity 0.15s, background 0.15s;
+  &:active { opacity: 0.7; }
+}
+@mixin pill($bg: $card-soft, $padding: 4px 10px) {
+  padding: $padding;
+  border-radius: $radius-full;
+  background: $bg;
+}
+@mixin divider($margin: 0) {
+  height: 1px;
+  background: $border;
+  margin: $margin;
+}

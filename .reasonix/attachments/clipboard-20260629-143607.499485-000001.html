@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WZ 外骨骼 BLE 调试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f1119;
+            color: #e0e0e0;
+            padding: 16px;
+            min-height: 100vh;
+        }
+
+        h2 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #a0b0c0;
+            margin: 12px 0 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            flex: 1;
+            min-width: 280px;
+        }
+
+        .card {
+            background: #1a1d2e;
+            border: 1px solid #2a2d3e;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+
+        .card-header {
+            font-size: 13px;
+            font-weight: 800;
+            color: #6cf;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-fff1 {
+            background: #22c7a533;
+            color: #22c7a5;
+        }
+
+        .badge-fff2 {
+            background: #00bcd433;
+            color: #00bcd4;
+        }
+
+        .badge-fff4 {
+            background: #e74c3c33;
+            color: #e74c3c;
+        }
+
+        .badge-fff5 {
+            background: #ff980033;
+            color: #ff9800;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        .btn:hover {
+            opacity: 0.8;
+        }
+
+        .btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .btn-connect {
+            background: #22c7a5;
+            color: #000;
+        }
+
+        .btn-disconnect {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .btn-mode {
+            background: #2a2d3e;
+            color: #e0e0e0;
+            min-width: 70px;
+        }
+
+        .btn-mode.active {
+            background: #6c5ce7;
+            color: #fff;
+        }
+
+        .btn-start {
+            background: #27ae60;
+            color: #fff;
+            min-width: 70px;
+        }
+
+        .btn-start.active {
+            background: #e74c3c;
+        }
+
+        .btn-cmd {
+            background: #33364d;
+            color: #c0c8d0;
+            padding: 6px 10px;
+            font-size: 11px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #6c5ce7;
+        }
+
+        .field-table {
+            width: 100%;
+            font-size: 11px;
+            border-collapse: collapse;
+        }
+
+        .field-table td {
+            padding: 3px 6px;
+        }
+
+        .field-table .label {
+            color: #889;
+            width: 120px;
+        }
+
+        .field-table .value {
+            color: #e0e0e0;
+            font-family: 'Consolas', monospace;
+            font-weight: 600;
+        }
+
+        .log-area {
+            background: #0d0f18;
+            border: 1px solid #2a2d3e;
+            border-radius: 8px;
+            padding: 10px;
+            max-height: 320px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 10px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-line {
+            margin: 0;
+        }
+
+        .log-fff2 {
+            color: #4fc3f7;
+        }
+
+        .log-fff4 {
+            color: #ef5350;
+        }
+
+        .log-fff5 {
+            color: #ff9800;
+        }
+
+        .log-ack {
+            color: #8bc34a;
+        }
+
+        .log-cmd {
+            color: #22c7a5;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            background: #1a1d2e;
+            border: 1px solid #2a2d3e;
+            border-radius: 10px;
+            margin-bottom: 12px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot-off {
+            background: #e74c3c;
+        }
+
+        .dot-on {
+            background: #22c7a5;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.4
+            }
+        }
+
+        .device-name {
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .device-id {
+            color: #889;
+            font-size: 11px;
+        }
+
+        .mono {
+            font-family: 'Consolas', monospace;
+        }
+
+        .combo {
+            display: flex;
+            gap: 4px;
+        }
+
+        .combo .btn {
+            border-radius: 0;
+        }
+
+        .combo .btn:first-child {
+            border-radius: 6px 0 0 6px;
+        }
+
+        .combo .btn:last-child {
+            border-radius: 0 6px 6px 0;
+        }
+
+        @media (max-width: 600px) {
+            .row {
+                flex-direction: column;
+            }
+
+            .col {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="status-bar">
+        <div class="dot dot-off" id="statusDot"></div>
+        <div>
+            <div class="device-name" id="deviceName">未连接</div>
+            <div class="device-id" id="deviceId">—</div>
+        </div>
+        <div style="flex:1"></div>
+        <button class="btn btn-connect" id="btnConnect" onclick="connect()">连接设备</button>
+        <button class="btn btn-disconnect" id="btnDisconnect" onclick="disconnect()" disabled>断开</button>
+    </div>
+
+    <div class="row">
+
+        <!-- 控制栏 -->
+        <div class="col">
+            <div class="card">
+                <div class="card-header"><span class="badge badge-fff1">FFF1</span> 命令控制</div>
+
+                <h2>工作模式</h2>
+                <div class="combo" id="modeBtns">
+                    <button class="btn btn-mode active" data-mode="0" onclick="setMode(0)">透明</button>
+                    <button class="btn btn-mode" data-mode="1" onclick="setMode(1)">助力</button>
+                    <button class="btn btn-mode" data-mode="2" onclick="setMode(2)">训练</button>
+                </div>
+
+                <h2 id="levelTitle">等级调节</h2>
+                <div id="assistRow" style="display:none; align-items:center; gap:10px">
+                    <span style="font-size:11px; color:#889">助力等级</span>
+                    <input type="range" min="1" max="10" value="1" id="assistSlider" style="flex:1"
+                        oninput="document.getElementById('assistVal').textContent=this.value">
+                    <span class="mono" id="assistVal" style="font-size:13px; font-weight:700">1</span>
+                    <button class="btn btn-cmd" onclick="setAssistLevel()">设置</button>
+                </div>
+                <div id="impedanceRow" style="display:none; align-items:center; gap:10px; margin-top:6px">
+                    <span style="font-size:11px; color:#889">阻力等级</span>
+                    <input type="range" min="1" max="10" value="1" id="impedanceSlider" style="flex:1"
+                        oninput="document.getElementById('impedanceVal').textContent=this.value">
+                    <span class="mono" id="impedanceVal" style="font-size:13px; font-weight:700">1</span>
+                    <button class="btn btn-cmd" onclick="setImpedanceLevel()">设置</button>
+                </div>
+
+                <h2>运行控制</h2>
+                <div style="display:flex; gap:8px; flex-wrap:wrap">
+                    <button class="btn btn-start" id="btnStart" onclick="toggleStart()">START</button>
+                    <button class="btn btn-cmd" onclick="sendCmd([0x03])">零点校准</button>
+                    <button class="btn btn-cmd" onclick="sendCmd([0x09])">清除故障</button>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据面板 -->
+        <div class="col" style="flex:2">
+            <!-- FFF2 状态 -->
+            <div class="card">
+                <div class="card-header"><span class="badge badge-fff2">FFF2</span> 状态上报 <span id="fff2Time"
+                        style="font-size:10px; color:#889; margin-left:auto"></span></div>
+                <table class="field-table" id="fff2Fields"></table>
+            </div>
+
+            <!-- FFF4 故障 -->
+            <div class="card" id="fff4Card" style="display:none">
+                <div class="card-header"><span class="badge badge-fff4">FFF4</span> 故障通知 <span id="fff4Time"
+                        style="font-size:10px; color:#889; margin-left:auto"></span></div>
+                <table class="field-table" id="fff4Fields"></table>
+            </div>
+
+            <!-- FFF5 传感器 -->
+            <div class="card">
+                <div class="card-header"><span class="badge badge-fff5">FFF5</span> 传感器数据 <span id="fff5Time"
+                        style="font-size:10px; color:#889; margin-left:auto"></span></div>
+                <table class="field-table" id="fff5Fields"></table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 日志 -->
+    <h2>原始数据日志 <span style="font-size:10px; color:#889; font-weight:400; margin-left:8px" id="logCount">0 条</span></h2>
+    <div class="log-area" id="logArea">
+        <div style="color:#889">等待 BLE 数据...</div>
+    </div>
+
+    <script>
+        // ── BLE 常量 ──
+        const SERVICE_UUID = '777a6b6a-3230-3236-6878-79717165786f';
+        const FFF1 = '0000fff1-0000-1000-8000-00805f9b34fb';
+        const FFF2 = '0000fff2-0000-1000-8000-00805f9b34fb';
+        const FFF3 = '0000fff3-0000-1000-8000-00805f9b34fb';
+        const FFF4 = '0000fff4-0000-1000-8000-00805f9b34fb';
+        const FFF5 = '0000fff5-0000-1000-8000-00805f9b34fb';
+        const FFF6 = '0000fff6-0000-1000-8000-00805f9b34fb';
+
+        // ── 状态 ──
+        let device = null, server = null, fff1Char = null;
+        let logLines = 0, running = false, currentMode = 0;
+
+        // ── 辅助函数 ──
+        const $ = id => document.getElementById(id);
+        const hex = bytes => [...bytes].map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+        const now = () => new Date().toLocaleTimeString('zh-CN', { hour12: false });
+
+        function addLog(cls, text) {
+            const area = $('logArea');
+            if (logLines === 0) area.innerHTML = '';
+            const p = document.createElement('p');
+            p.className = 'log-line ' + cls;
+            p.textContent = `[${now()}] ${text}`;
+            area.insertBefore(p, area.firstChild);
+            if (++logLines > 200) area.removeChild(area.lastChild);
+            $('logCount').textContent = logLines + ' 条';
+        }
+
+        // console + 页面日志双输出（绿色 info 通道）
+        function logInfo(text) {
+            console.log(text);
+            addLog('log-ack', text);
+        }
+
+        // ── BLE 扫码 + 连接 ──
+
+        async function connect() {
+            try {
+                $('btnConnect').disabled = true;
+
+                // 检测 WebBluetooth 可用性
+                if (!navigator.bluetooth) {
+                    throw new Error('WebBluetooth 不可用：请使用 Chrome/Edge 打开此页面');
+                }
+                const bt = await navigator.bluetooth.getAvailability();
+                logInfo(`蓝牙可用: ${bt ? '是' : '否（请检查系统蓝牙是否开启）'}`);
+                if (!bt) {
+                    $('btnConnect').disabled = false;
+                    return;
+                }
+
+                // 获取已配对设备
+                try {
+                    const list = await navigator.bluetooth.getDevices();
+                    logInfo(`已配对: ${list.length} 台`);
+                    if (list.length) list.forEach((d, i) => logInfo(`  [${i}] "${d.name || '?'}" ${d.id}`));
+                } catch (_) { logInfo('getDevices 不支持'); }
+
+                logInfo('打开扫描窗口（若列表为空，确认外骨骼已上电、未被其他 App 占用）');
+
+                // 使用 Service UUID 过滤
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }],
+                    optionalServices: [SERVICE_UUID],
+                });
+
+                logInfo(`选中: "${device.name || '?'}" ${device.id}`);
+
+                // 尝试获取广播信息
+                try {
+                    if (device.watchAdvertisements) {
+                        await device.watchAdvertisements();
+                        device.addEventListener('advertisementreceived', (ev) => {
+                            const info = [`rssi=${ev.rssi}dBm`, `tx=${ev.txPower}`,
+                            `svc=[${[...(ev.serviceUUIDs || [])].map(u => u.toString()).join(',')}]`];
+                            logInfo(`广播: ${info.join('  ')}`);
+                        });
+                    }
+                } catch (_) { /* 不支持则忽略 */ }
+
+                device.addEventListener('gattserverdisconnected', onDisconnected);
+
+                server = await device.gatt.connect();
+                logInfo('GATT 已连接');
+
+                // 遍历所有 GATT 服务，找到目标服务（兼容 WebBluetooth UUID 标准化）
+                const allServices = await server.getPrimaryServices();
+                logInfo(`--- GATT Services (${allServices.length}) ---`);
+                let targetService = null;
+                for (const srv of allServices) {
+                    const isTarget = srv.uuid.toLowerCase() === SERVICE_UUID;
+                    const prefix = isTarget ? '★' : ' ';
+                    const suffix = isTarget ? '  ← 目标' : '';
+                    logInfo(`${prefix} ${srv.uuid}${suffix}`);
+                    // WebBluetooth 需要显式获取特征列表
+                    try {
+                        const chars = await srv.getCharacteristics();
+                        for (const ch of chars) {
+                            const props = [];
+                            if (ch.properties.read) props.push('R');
+                            if (ch.properties.write) props.push('W');
+                            if (ch.properties.writeWithoutResponse) props.push('WNR');
+                            if (ch.properties.notify) props.push('Notify');
+                            if (ch.properties.indicate) props.push('Ind');
+                            const labels = { [FFF1]: 'FFF1', [FFF2]: 'FFF2', [FFF3]: 'FFF3', [FFF4]: 'FFF4', [FFF5]: 'FFF5', [FFF6]: 'FFF6' };
+                            logInfo(`      ${ch.uuid}  ${labels[ch.uuid] || ''} [${props.join(',')}]`);
+                        }
+                    } catch (e) {
+                        logInfo(`      无法获取特征: ${e.message}`);
+                    }
+                    if (isTarget) targetService = srv;
+                }
+
+                if (!targetService) throw new Error('未找到目标 Service UUID: ' + SERVICE_UUID);
+
+                // 获取特征（严格从 Flutter 项目 ble_service 迁移，6 个特征）
+                fff1Char = await targetService.getCharacteristic(FFF1);
+                const fff2Char = await targetService.getCharacteristic(FFF2);
+                const fff3Char = await getCharOrNull(targetService, FFF3);
+                const fff4Char = await targetService.getCharacteristic(FFF4);
+                const fff5Char = await targetService.getCharacteristic(FFF5);
+                const fff6Char = await getCharOrNull(targetService, FFF6);
+                logInfo('特征已就绪 (FFF1/2/3/4/5/6)');
+
+                // 订阅：与 Flutter ble_service 一致 — 全部订阅
+                await fff2Char.startNotifications();
+                fff2Char.addEventListener('characteristicvaluechanged', onFff2);
+                logInfo('已订阅 FFF2');
+
+                if (fff3Char) {
+                    await fff3Char.startNotifications();
+                    logInfo('已订阅 FFF3 (参数 — 暂未启用)');
+                }
+
+                await fff4Char.startNotifications();
+                fff4Char.addEventListener('characteristicvaluechanged', onFff4);
+                logInfo('已订阅 FFF4');
+
+                await fff5Char.startNotifications();
+                fff5Char.addEventListener('characteristicvaluechanged', onFff5);
+                logInfo('已订阅 FFF5');
+
+                if (fff6Char) {
+                    await fff6Char.startNotifications();
+                    logInfo('已订阅 FFF6 (日志 — 暂未启用)');
+                }
+
+                // 更新 UI：与 Flutter exo_command_service.connect 一致
+                $('statusDot').className = 'dot dot-on';
+                $('deviceName').textContent = device.name || '外骨骼设备';
+                $('deviceId').textContent = device.id;
+                $('btnConnect').disabled = true;
+                $('btnDisconnect').disabled = false;
+                logInfo('连接完成 ✓');
+
+                // 握手：HELLO → SET_USER_PROFILE（与 Flutter 初始化流程一致）
+                logInfo('发送 HELLO (0x01)');
+                await sendCmd([0x01]);
+                await sleep(200);
+                logInfo('发送 SET_USER_PROFILE');
+                await sendUserProfile();
+
+            } catch (err) {
+                logInfo(`连接失败: ${err.message || err}`);
+                console.error(err);
+                $('btnConnect').disabled = false;
+            }
+        }
+
+        // 安全获取特征（可选特征不存在时不报错）
+        async function getCharOrNull(service, uuid) {
+            try { return await service.getCharacteristic(uuid); } catch (_) { return null; }
+        }
+
+        function onDisconnected() {
+            addLog('log-fff4', '设备已断开');
+            $('statusDot').className = 'dot dot-off';
+            $('deviceName').textContent = '未连接';
+            $('deviceId').textContent = '—';
+            $('btnConnect').disabled = false;
+            $('btnDisconnect').disabled = true;
+            device = null; server = null; fff1Char = null;
+        }
+
+        async function disconnect() {
+            if (device && device.gatt.connected) {
+                await device.gatt.disconnect();
+            }
+        }
+
+        // ── 命令发送 ──
+        async function sendCmd(bytes) {
+            if (!fff1Char) { addLog('log-fff4', '未连接'); return; }
+            const data = new Uint8Array(bytes);
+            try {
+                // 使用 writeValueWithResponse 以匹配 Flutter 项目（ble_service.dart:289 withoutResponse=false）
+                // 确保 BLE 层传输确认，避免 Write Command 被外设静默丢弃
+                await fff1Char.writeValueWithResponse(data);
+                addLog('log-cmd', `→ FFF1: [${hex(data)}]`);
+            } catch (err) {
+                addLog('log-fff4', `写入失败: ${err.message || err}`);
+            }
+        }
+
+        async function sendUserProfile() {
+            const buf = new ArrayBuffer(11);
+            const dv = new DataView(buf);
+            dv.setUint8(0, 0x02);            // command byte: SET_USER_PROFILE
+            dv.setFloat32(1, 170.0, true);   // height_cm (float32 LE)
+            dv.setFloat32(5, 70.0, true);    // weight_kg (float32 LE)
+            dv.setUint8(9, 30);              // age
+            dv.setUint8(10, 1);              // gender (1=男)
+            await sendCmd(new Uint8Array(buf));
+        }
+
+        function updateLevelUI() {
+            const assistRow = $('assistRow');
+            const impedanceRow = $('impedanceRow');
+            const title = $('levelTitle');
+            // mode 0=透明(无等级), 1=助力(助力等级), 2=训练(阻力等级)
+            if (currentMode === 1) {
+                assistRow.style.display = 'flex';
+                impedanceRow.style.display = 'none';
+                title.textContent = '助力等级';
+            } else if (currentMode === 2) {
+                assistRow.style.display = 'none';
+                impedanceRow.style.display = 'flex';
+                title.textContent = '阻力等级';
+            } else {
+                assistRow.style.display = 'none';
+                impedanceRow.style.display = 'none';
+                title.textContent = '等级调节';
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            $('modeBtns').querySelectorAll('.btn-mode').forEach(b => b.classList.toggle('active', parseInt(b.dataset.mode) === mode));
+            updateLevelUI();
+            sendCmd([0x04, mode]);
+        }
+
+        function setAssistLevel() {
+            const v = parseInt($('assistSlider').value);
+            sendCmd([0x05, v]);
+        }
+
+        function setImpedanceLevel() {
+            const v = parseInt($('impedanceSlider').value);
+            sendCmd([0x06, v]);
+        }
+
+        function toggleStart() {
+            if (running) {
+                sendCmd([0x08]);
+                $('btnStart').textContent = 'START';
+                $('btnStart').classList.remove('active');
+                running = false;
+            } else {
+                sendCmd([0x07]);
+                $('btnStart').textContent = 'STOP';
+                $('btnStart').classList.add('active');
+                running = true;
+            }
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // ── FFF2 解析 (30B 状态 / 1B ACK) ──
+        const EXO_STATES = ['BOOT', 'SELF_CHECK', 'IDLE', 'BLE_CONNECTED', 'USER_CONFIGURED',
+            'TRANSPARENT_READY', 'TRANSPARENT_RUNNING', 'ASSIST_READY', 'ASSIST_RUNNING',
+            'TRAINING_READY', 'TRAINING_RUNNING', 'STOPPING', 'FAULT'];
+        const EXO_MODES = ['透明', '助力', '训练'];
+        const RESP_CODES = { 0: '成功', 1: '运行中无法执行', 2: '状态不允许', 3: '故障禁止操作', 4: '参数范围无效', 5: '电机未就绪', 6: '超时' };
+
+        function onFff2(event) {
+            const dv = event.target.value;
+            const data = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+            addLog('log-fff2', `← FFF2 ${data.length}B: [${hex(data)}]`);
+
+            if (data.length === 1) {
+                // ACK 响应
+                const resp = RESP_CODES[data[0]] || `0x${data[0].toString(16)}`;
+                addLog('log-ack', `ACK: ${resp}`);
+                return;
+            }
+            if (data.length < 30) return;
+
+            const buf = new DataView(dv.buffer, dv.byteOffset, 30);
+            const ts = buf.getUint32(0, true);
+            const state = buf.getUint8(4);
+            const mode = buf.getUint8(5);
+            const isRunning = buf.getUint8(6);
+            const battery = buf.getUint8(7);
+            const fault = buf.getUint32(8, true);
+            const lAngle = buf.getInt16(12, true) / 100;
+            const rAngle = buf.getInt16(14, true) / 100;
+            const lTorque = buf.getInt16(16, true) / 1000;
+            const rTorque = buf.getInt16(18, true) / 1000;
+            const assist = buf.getUint8(20);
+            const impedance = buf.getUint8(21);
+            const steps = buf.getUint32(22, true);
+            const runtime = buf.getUint32(26, true);
+
+            const tBody = $('fff2Fields');
+            tBody.innerHTML = `
+    <tr><td class="label">时间戳</td><td class="value">${ts} ms</td></tr>
+    <tr><td class="label">状态</td><td class="value">${state} (${EXO_STATES[state] || '?'})</td></tr>
+    <tr><td class="label">模式</td><td class="value">${EXO_MODES[mode] || mode}</td></tr>
+    <tr><td class="label">运行中</td><td class="value">${isRunning ? '✅ 是' : '⏸ 否'}</td></tr>
+    <tr><td class="label">电量</td><td class="value">${battery}%</td></tr>
+    <tr><td class="label">故障码</td><td class="value">0x${fault.toString(16).toUpperCase().padStart(8, '0')} ${fault ? '⚠' : '✓'}</td></tr>
+    <tr><td class="label">左髋角度</td><td class="value">${lAngle.toFixed(2)}°</td></tr>
+    <tr><td class="label">右髋角度</td><td class="value">${rAngle.toFixed(2)}°</td></tr>
+    <tr><td class="label">左力矩</td><td class="value">${lTorque.toFixed(3)} N·m</td></tr>
+    <tr><td class="label">右力矩</td><td class="value">${rTorque.toFixed(3)} N·m</td></tr>
+    <tr><td class="label">助力等级</td><td class="value">${assist}</td></tr>
+    <tr><td class="label">阻力等级</td><td class="value">${impedance}</td></tr>
+    <tr><td class="label">步数</td><td class="value">${steps}</td></tr>
+    <tr><td class="label">运行时长</td><td class="value">${runtime} s</td></tr>`;
+            $('fff2Time').textContent = now();
+        }
+
+        // ── FFF4 解析 (12B 故障包) ──
+        function onFff4(event) {
+            const dv = event.target.value;
+            const data = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+            addLog('log-fff4', `← FFF4 ${data.length}B: [${hex(data)}]`);
+            if (data.length < 12) return;
+
+            const buf = new DataView(dv.buffer, dv.byteOffset, 12);
+            const ts = buf.getUint32(0, true);
+            const fault = buf.getUint32(4, true);
+            const state = buf.getUint8(8);
+
+            $('fff4Card').style.display = 'block';
+            $('fff4Fields').innerHTML = `
+    <tr><td class="label">时间戳</td><td class="value">${ts} ms</td></tr>
+    <tr><td class="label">故障码</td><td class="value">0x${fault.toString(16).toUpperCase().padStart(8, '0')} ${fault ? '⚠ 故障' : '✓ 已清除'}</td></tr>
+    <tr><td class="label">状态</td><td class="value">${state} (${EXO_STATES[state] || '?'})</td></tr>`;
+            $('fff4Time').textContent = now();
+        }
+
+        // ── FFF5 解析 (60B 传感器包) ──
+        function onFff5(event) {
+            const dv = event.target.value;
+            const data = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+            addLog('log-fff5', `← FFF5 ${data.length}B: [${hex(data)}]`);
+            if (data.length < 60) return;
+
+            const buf = new DataView(dv.buffer, dv.byteOffset, 60);
+            const ts = buf.getUint32(0, true);
+            const roll = buf.getFloat32(4, true);
+            const pitch = buf.getFloat32(8, true);
+            const yaw = buf.getFloat32(12, true);
+            const accX = buf.getFloat32(16, true);
+            const accY = buf.getFloat32(20, true);
+            const accZ = buf.getFloat32(24, true);
+            const gyroX = buf.getFloat32(28, true);
+            const gyroY = buf.getFloat32(32, true);
+            const gyroZ = buf.getFloat32(36, true);
+            const alt = buf.getFloat32(40, true);
+            const baroT = buf.getFloat32(44, true);
+            const m0T = buf.getFloat32(48, true);
+            const m1T = buf.getFloat32(52, true);
+            const bat = buf.getUint8(56);
+
+            $('fff5Fields').innerHTML = `
+    <tr><td class="label">横滚 roll</td><td class="value">${roll.toFixed(2)}°</td>
+        <td class="label">俯仰 pitch</td><td class="value">${pitch.toFixed(2)}°</td></tr>
+    <tr><td class="label">偏航 yaw</td><td class="value">${yaw.toFixed(2)}°</td>
+        <td class="label">电量</td><td class="value">${bat}%</td></tr>
+    <tr><td class="label">加速度 X</td><td class="value">${accX.toFixed(2)} m/s²</td>
+        <td class="label">海拔</td><td class="value">${alt.toFixed(1)} m</td></tr>
+    <tr><td class="label">加速度 Y</td><td class="value">${accY.toFixed(2)} m/s²</td>
+        <td class="label">气压温度</td><td class="value">${baroT.toFixed(1)}°C</td></tr>
+    <tr><td class="label">加速度 Z</td><td class="value">${accZ.toFixed(2)} m/s²</td>
+        <td class="label">电机0温度</td><td class="value">${m0T.toFixed(1)}°C</td></tr>
+    <tr><td class="label">角速度 X</td><td class="value">${gyroX.toFixed(3)} rad/s</td>
+        <td class="label">电机1温度</td><td class="value">${m1T.toFixed(1)}°C</td></tr>
+    <tr><td class="label">角速度 Y</td><td class="value">${gyroY.toFixed(3)} rad/s</td><td></td><td></td></tr>
+    <tr><td class="label">角速度 Z</td><td class="value">${gyroZ.toFixed(3)} rad/s</td><td></td><td></td></tr>`;
+            $('fff5Time').textContent = now();
+        }
+    </script>
+</body>
+
+</html>

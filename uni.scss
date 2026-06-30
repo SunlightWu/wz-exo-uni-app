@@ -1,0 +1,91 @@
+// ── 引入 uview-next 基础主题变量 ──
+// 先引入基础变量，然后在下方覆盖自定义值
+@import "/uni_modules/uview-next/theme.scss";
+
+// ── 覆盖 uview-next 主题色为外骨骼紫色系 ──
+$u-primary: #00C9A7;
+$u-primary-dark: #00B894;
+$u-primary-disabled: #A0EDDD;
+$u-primary-light: #E6F9F5;
+
+$u-success: #28C76F;
+$u-success-dark: #1FA85A;
+$u-success-light: #E9FBF1;
+
+$u-warning: #FFB547;
+$u-warning-dark: #E09A30;
+$u-warning-light: #FFF8ED;
+
+$u-error: #FF5C7A;
+$u-error-dark: #E04865;
+$u-error-light: #FFEEF2;
+
+$u-info: #85689D;
+$u-info-dark: #6B5082;
+$u-info-light: #F8F2FF;
+
+// ── 全局 Mixins（微信小程序不支持 :root CSS 变量，使用 SCSS 变量） ──
+$pageBg: #f0f4fa;
+$cardBg: #FFFFFF;
+$cardSoftBg: #F0E2FF;
+$borderColor: #E6D3F8;
+$textMainColor: #28123E;
+$textSubColor: #85689D;
+$primaryColor: #00C9A7;
+$successColor: #28C76F;
+$warningColor: #FFB547;
+$dangerColor: #FF5C7A;
+$radiusXl: 30px;
+$radiusLg: 24px;
+$radiusMd: 16px;
+$radiusSm: 10px;
+$radiusFull: 999px;
+
+@mixin page-base {
+  min-height: 100vh;
+  background: $pageBg;
+  padding-bottom: 40px;
+}
+@mixin card-base {
+  background: $cardBg;
+  border-radius: $radiusXl;
+  border: 1.4px solid $borderColor;
+  overflow: hidden;
+}
+@mixin flex-row($gap: 12px) {
+  display: flex;
+  align-items: center;
+  gap: $gap;
+}
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+@mixin text-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: $textMainColor;
+}
+@mixin text-body {
+  font-size: 14px;
+  color: $textMainColor;
+}
+@mixin text-caption {
+  font-size: 12px;
+  color: $textSubColor;
+}
+@mixin tap-active {
+  transition: opacity 0.15s, background 0.15s;
+  &:active { opacity: 0.7; }
+}
+@mixin pill($bg: $cardSoftBg, $padding: 4px 10px) {
+  padding: $padding;
+  border-radius: $radiusFull;
+  background: $bg;
+}
+@mixin divider($margin: 0) {
+  height: 1px;
+  background: $borderColor;
+  margin: $margin;
+}
