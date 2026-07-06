@@ -11,7 +11,7 @@
 		<view class="map-area">
 			<map id="mapEl" ref="mapEl" class="map-view" :latitude="mapCenter.lat" :longitude="mapCenter.lng"
 				:markers="mapMarkers" :scale="mapScale" :enable-zoom="true" :enable-scroll="true"
-				:show-location="true"
+				:show-location="false"
 				@markertap="onMarkerTap" @regionchange="onRegionChange">
 				<view class="locate-center">
 					<image class="locate-center-img" src="/static/locate.png"></image>
@@ -163,10 +163,11 @@
 				height: 40,
 				callout: {
 					content: `可租 ${available} 台`,
-					color: '#333',
+					color: '#fff',
 					fontSize: 12,
 					borderRadius: 8,
-					bgColor: '#fff',
+					borderColor:'#9268f7',
+					bgColor: '#9268f7',
 					padding: 6,
 					display: 'ALWAYS',
 					textAlign: 'center',

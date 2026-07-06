@@ -115,6 +115,7 @@ function httpRequest(method, url, data = null, options = {}) {
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(res.data);
           } else {
+
             const msg = res.data?.message || res.data?.msg || `服务器错误 (${res.statusCode})`;
             reject(new Error(`HTTP ${res.statusCode}: ${msg}`));
           }
