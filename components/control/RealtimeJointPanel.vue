@@ -64,6 +64,13 @@ const WAVE_VALUES = [
 	0.48, 0.44, 0.50, 0.46,
 ];
 
+function hexToRgba(hex, alpha) {
+	const r = parseInt(hex.slice(1, 3), 16);
+	const g = parseInt(hex.slice(3, 5), 16);
+	const b = parseInt(hex.slice(5, 7), 16);
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function drawSpark(canvasId, points, isRight) {
 	const ctx = uni.createCanvasContext(canvasId);
 	if (!ctx) return;
@@ -90,7 +97,7 @@ function drawSpark(canvasId, points, isRight) {
 			if (i === 0) ctx.moveTo(x, y);
 			else ctx.lineTo(x, y);
 		}
-		ctx.strokeStyle = props.accent + 'B3';
+		ctx.strokeStyle = hexToRgba(props.accent, 0.70);
 		ctx.lineWidth = 2;
 		ctx.lineCap = 'round';
 		ctx.lineJoin = 'round';
@@ -155,7 +162,7 @@ watch(() => [props.status.leftHipAngle, props.status.rightHipAngle], () => {
 .panel-title {
 	font-size: 14px;
 	font-weight: 900;
-	color: #28123E;
+	color: #333;
 }
 
 .joint-row {
@@ -178,7 +185,7 @@ watch(() => [props.status.leftHipAngle, props.status.rightHipAngle], () => {
 .tile-subtitle {
 	font-size: 11px;
 	font-weight: 800;
-	color: #85689D;
+	color: #999;
 }
 
 .tile-data {
@@ -192,7 +199,7 @@ watch(() => [props.status.leftHipAngle, props.status.rightHipAngle], () => {
 .tile-angle {
 	font-size: 22px;
 	font-weight: 900;
-	color: #28123E;
+	color: #333;
 	flex-shrink: 0;
 }
 
@@ -208,7 +215,7 @@ watch(() => [props.status.leftHipAngle, props.status.rightHipAngle], () => {
 
 .divider {
 	width: 1px;
-	background: rgba(133, 104, 157, 0.16);
+	background: rgba(0, 0, 0, 0.08);
 	margin: 0 14px;
 	align-self: stretch;
 }

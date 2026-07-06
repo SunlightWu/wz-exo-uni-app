@@ -1,0 +1,26 @@
+{
+  "name": "wz-exo-uni-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SunlightWu/wz-exo-uni-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SunlightWu/wz-exo-uni-app/issues"
+  },
+  "homepage": "https://github.com/SunlightWu/wz-exo-uni-app#readme",
+  "dependencies": {
+    "@vue/compiler-sfc": "^3.5.39"
+  }
+}

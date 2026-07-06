@@ -45,7 +45,7 @@ function onTap() {
 <style scoped>
 .wide-mode-switch {
 	width: 100px;
-	height: 40px;
+	height: 34px;
 	border-radius: 20px;
 	position: relative;
 	padding: 4px;

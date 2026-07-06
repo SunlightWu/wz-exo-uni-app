@@ -9,7 +9,14 @@
 			>
 				<text class="btn-icon">-</text>
 			</view>
-			<view class="slider-wrap">
+			<view
+				class="slider-wrap"
+				:class="{ dragging: dragging }"
+				@touchstart="onTouchStart"
+				@touchmove="onTouchMove"
+				@touchend="onTouchEnd"
+				@touchcancel="onTouchEnd"
+			>
 				<view class="slider-track" @click="onTrackTap" ref="trackRef">
 					<view class="slider-fill" :style="fillStyle"></view>
 				</view>
@@ -39,7 +46,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, getCurrentInstance } from 'vue';
+import { ref, computed, watch, getCurrentInstance, onMounted } from 'vue';
+
+function hexToRgba(hex, alpha) {
+	const r = parseInt(hex.slice(1, 3), 16);
+	const g = parseInt(hex.slice(3, 5), 16);
+	const b = parseInt(hex.slice(5, 7), 16);
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 const props = defineProps({
 	visible: { type: Boolean, default: true },
@@ -105,15 +119,26 @@ watch(progress, (newVal) => {
 });
 
 const fillStyle = computed(() => ({
-	width: `${animProgress.value * 100}%`,
-	backgroundColor: props.accent + '6B',
+	width: `calc(14px + (100% - 28px) * ${animProgress.value})`,
+	backgroundColor: hexToRgba(props.accent, 0.42),
 }));
 
 const thumbStyle = computed(() => ({
-	left: `calc(${animProgress.value * 100}% - 18px)`,
+	left: `calc((100% - 28px) * ${animProgress.value})`,
 }));
 
-function setLevel(value, end = true) {
+// ── 防抖 emit：按钮点击 / 拖动结束 / 轨道点击 都走这里 ──
+let debounceTimer = null;
+const DEBOUNCE_MS = 300;
+
+function emitChange(value) {
+	if (debounceTimer) clearTimeout(debounceTimer);
+	debounceTimer = setTimeout(() => {
+		emit('change', value);
+	}, DEBOUNCE_MS);
+}
+
+function updateLevel(value, shouldEmit = true) {
 	const next = Math.max(1, Math.min(10, value));
 	const current = Math.round(displayLevel.value).clamp(1, 10);
 	if (next !== current) {
@@ -123,37 +148,100 @@ function setLevel(value, end = true) {
 		uni.vibrateShort({ type: vibrateType });
 	}
 	displayLevel.value = next;
-	dragging.value = !end;
-	if (end) {
-		emit('change', next);
+	if (shouldEmit) {
+		emitChange(next);
 	}
 }
 
 function onMinus() {
 	if (snappedLevel.value > 1) {
-		setLevel(snappedLevel.value - 1, true);
+		updateLevel(snappedLevel.value - 1);
 	}
 }
 
 function onPlus() {
 	if (snappedLevel.value < 10) {
-		setLevel(snappedLevel.value + 1, true);
+		updateLevel(snappedLevel.value + 1);
 	}
 }
 
-function onTrackTap(e) {
+// ── Touch 滑动 ──
+let trackRect = null;
+
+function createTrackQuery() {
 	const instance = getCurrentInstance();
-	const query = uni.createSelectorQuery().in(instance);
+	// 微信小程序自定义组件中，使用 instance.proxy 避免 $scope null 错误
+	if (instance && instance.proxy) {
+		try {
+			return uni.createSelectorQuery().in(instance.proxy);
+		} catch (e) {
+			// fallback
+		}
+	}
+	return uni.createSelectorQuery();
+}
+
+function fetchTrackRect(callback) {
+	const query = createTrackQuery();
 	query.select('.slider-track').boundingClientRect(rect => {
-		if (!rect) return;
-		const x = e.detail.x - rect.left;
-		const ratio = Math.max(0, Math.min(1, x / rect.width));
-		setLevel(Math.round(1 + ratio * 9), true);
+		if (rect) trackRect = rect;
+		if (callback) callback(rect);
 	}).exec();
 }
 
-// 初始化
-animProgress.value = progress.value;
+function onTrackTap(e) {
+	const pageX = e.detail.x;
+	if (trackRect) {
+		const x = pageX - trackRect.left;
+		const ratio = Math.max(0, Math.min(1, x / trackRect.width));
+		updateLevel(Math.round(1 + ratio * 9));
+	} else {
+		fetchTrackRect((rect) => {
+			if (!rect) return;
+			const x = pageX - rect.left;
+			const ratio = Math.max(0, Math.min(1, x / rect.width));
+			updateLevel(Math.round(1 + ratio * 9));
+		});
+	}
+}
+
+function onTouchStart(e) {
+	dragging.value = true;
+	if (animFrame) {
+		clearTimeout(animFrame);
+		animFrame = null;
+	}
+	if (trackRect) {
+		onTouchMove(e);
+	} else {
+		fetchTrackRect(() => onTouchMove(e));
+	}
+}
+
+function onTouchMove(e) {
+	if (!dragging.value) return;
+	const touch = e.touches[0];
+	if (!touch || !trackRect) return;
+	const x = touch.clientX - trackRect.left;
+	const ratio = Math.max(0, Math.min(1, x / trackRect.width));
+	displayLevel.value = Math.round(1 + ratio * 9).clamp(1, 10);
+	animProgress.value = ratio.clamp(0, 1);
+}
+
+function onTouchEnd() {
+	if (!dragging.value) return;
+	dragging.value = false;
+	// 拖动结束时 emit
+	emitChange(snappedLevel.value);
+}
+
+// 初始化：延迟获取轨道位置，避免 $scope 未就绪
+onMounted(() => {
+	animProgress.value = progress.value;
+	setTimeout(() => {
+		fetchTrackRect();
+	}, 100);
+});
 </script>
 
 <script>
@@ -164,13 +252,13 @@ Number.prototype.clamp = function(min, max) {
 
 <style scoped>
 .level-selector {
-	margin-top: 18px;
+	/* margin: 18px 0; */
 }
 
 .level-label {
 	font-size: 14px;
 	font-weight: 900;
-	color: #28123E;
+	color: #333;
 	margin-bottom: 10px;
 	display: block;
 }
@@ -205,14 +293,19 @@ Number.prototype.clamp = function(min, max) {
 .btn-icon {
 	font-size: 28px;
 	font-weight: 300;
-	color: #28123E;
+	color: #333;
 	line-height: 1;
 }
 
 .slider-wrap {
 	flex: 1;
 	position: relative;
-	height: 56px;
+	height: 66px;
+}
+
+.slider-wrap.dragging .slider-thumb,
+.slider-wrap.dragging .slider-fill {
+	transition: none;
 }
 
 .slider-track {
@@ -234,7 +327,7 @@ Number.prototype.clamp = function(min, max) {
 .slider-thumb {
 	position: absolute;
 	top: 2px;
-	width: 36px;
+	width: 28px;
 	height: 42px;
 	background: #fff;
 	border-radius: 999px;
@@ -257,22 +350,22 @@ Number.prototype.clamp = function(min, max) {
 	position: absolute;
 	left: 0;
 	right: 0;
-	top: 36px;
+	top: 46px;
 	display: flex;
 	justify-content: space-between;
-	padding: 0 6px;
+	padding: 0 4px;
 }
 
 .level-num {
+	width: 20px;
 	font-size: 14px;
 	font-weight: 900;
-	color: #85689D;
-	width: 24px;
+	color: #999;
 	text-align: center;
 	transition: color 0.2s;
 }
 
 .level-num.active {
-	color: #28123E;
+	color: #333;
 }
 </style>

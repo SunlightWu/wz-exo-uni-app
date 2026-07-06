@@ -63,7 +63,7 @@ const props = defineProps({
 
 .back-icon {
 	font-size: 20px;
-	color: #28123E;
+	color: #333;
 }
 
 .device-name {
@@ -72,7 +72,7 @@ const props = defineProps({
 	transform: translateX(-50%);
 	font-size: 19px;
 	font-weight: 900;
-	color: #28123E;
+	color: #333;
 	max-width: 200px;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -95,13 +95,13 @@ const props = defineProps({
 
 .battery-icon {
 	font-size: 16px;
-	color: #85689D;
+	color: #999;
 }
 
 .battery-text {
 	font-size: 12px;
 	font-weight: 700;
-	color: #85689D;
+	color: #999;
 }
 
 .debug-hotspot {

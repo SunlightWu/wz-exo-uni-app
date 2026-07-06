@@ -78,8 +78,9 @@ const modeLabelMap = {
 const title = computed(() => {
 	if (hasFault.value) return '运行异常';
 	if (props.isStopping) return '停止中';
-	if (props.enabled) return `运行中`;
-	return `${modeLabelMap[props.status.mode] || '待机'}待机`;
+	const modeName = modeLabelMap[props.status.mode] || '透明模式';
+	if (props.enabled) return `${modeName}已运行`;
+	return `${modeName}待机中`;
 });
 
 const detail = computed(() => {
@@ -144,7 +145,7 @@ const cardColor = computed(() => {
 .status-title {
 	font-size: 20px;
 	font-weight: 900;
-	color: #28123E;
+	color: #333;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -153,7 +154,7 @@ const cardColor = computed(() => {
 .status-detail {
 	font-size: 13px;
 	font-weight: 800;
-	color: #85689D;
+	color: #999;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

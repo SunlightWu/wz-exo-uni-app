@@ -39,6 +39,13 @@ const innerStyle = computed(() => ({
 let animFrame = null;
 let currentProgress = 0;
 
+function hexToRgba(hex, alpha) {
+	const r = parseInt(hex.slice(1, 3), 16);
+	const g = parseInt(hex.slice(3, 5), 16);
+	const b = parseInt(hex.slice(5, 7), 16);
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function drawRing(targetProgress) {
 	const ctx = uni.createCanvasContext(canvasId.value);
 	if (!ctx) return;
@@ -61,7 +68,7 @@ function drawRing(targetProgress) {
 	const endAngle = -Math.PI / 2 + Math.PI * 2 * targetProgress;
 	ctx.beginPath();
 	ctx.arc(center, center, radius, -Math.PI / 2, endAngle, false);
-	ctx.strokeStyle = props.accent + 'B3'; // 70% opacity
+	ctx.strokeStyle = hexToRgba(props.accent, 0.70);
 	ctx.lineWidth = 4;
 	ctx.lineCap = 'round';
 	ctx.stroke();
@@ -144,14 +151,14 @@ watch(() => props.progress, (newVal) => {
 .bubble-value {
 	font-size: 16px;
 	font-weight: 900;
-	color: #28123E;
+	color: #333;
 	line-height: 1.2;
 }
 
 .bubble-label {
 	font-size: 10px;
 	font-weight: 800;
-	color: #28123E;
+	color: #666;
 	margin-top: 2px;
 }
 </style>

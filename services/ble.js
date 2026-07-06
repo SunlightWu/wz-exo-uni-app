@@ -39,71 +39,91 @@ export function initBluetooth() {
   });
 }
 
-// ── 扫描设备（按广播 UUID 过滤） ──
-export function startScan(timeoutSec = 8) {
+// ── 扫描设备 ──
+// 优化点：
+// 1. 支持 onDeviceFound 回调，UI 可实时展示设备
+// 2. 默认超时缩短为 5 秒
+// 3. 去掉冗余的二次扫描，一次扫描同时按名称过滤
+// 4. 扫描结束后返回按信号强度排序的结果
+export function startScan(timeoutSec = 5, onDeviceFound = null) {
   return new Promise((resolve, reject) => {
     const devices = [];
+    const nameFilter = (dev) => {
+      const name = (dev.localName || dev.name || '').toUpperCase();
+      return name.includes('WZ-') || name.includes('EXO');
+    };
+
     const addDevice = (dev) => {
       if (!devices.find(d => d.deviceId === dev.deviceId)) {
         devices.push(dev);
+        if (onDeviceFound) onDeviceFound(dev);
       }
     };
-    uni.onBluetoothDeviceFound((res) => {
+
+    // 使用局部回调，确保 offBluetoothDeviceFound 能正确移除
+    let foundCallback = null;
+
+    const cleanup = () => {
+      if (foundCallback) {
+        try { uni.offBluetoothDeviceFound(foundCallback); } catch (e) {}
+        foundCallback = null;
+      }
+      startScan._stopFn = null;
+      startScan._activeTimer = null;
+    };
+
+    const stopAndResolve = () => {
+      uni.stopBluetoothDevicesDiscovery({
+        complete: () => {
+          cleanup();
+          const filtered = devices.filter(nameFilter);
+          const result = filtered.length > 0 ? filtered : devices;
+          result.sort((a, b) => (b.RSSI || -100) - (a.RSSI || -100));
+          resolve(result);
+        }
+      });
+    };
+
+    foundCallback = (res) => {
       for (const dev of res.devices) addDevice(dev);
-    });
+    };
+    uni.onBluetoothDeviceFound(foundCallback);
+
+    // 先尝试带 UUID 过滤扫描（更快更精准）
     uni.startBluetoothDevicesDiscovery({
       services: [SCAN_FILTER_UUID],
       allowDuplicatesKey: false,
       interval: 0,
       success: () => {
-        setTimeout(() => {
-          uni.stopBluetoothDevicesDiscovery();
-          if (devices.length === 0) {
-            uni.startBluetoothDevicesDiscovery({
-              allowDuplicatesKey: false,
-              interval: 0,
-              success: () => {
-                setTimeout(() => {
-                  uni.stopBluetoothDevicesDiscovery();
-                  const filtered = devices.filter(d =>
-                    (d.localName || d.name || '').toUpperCase().includes('WZ-') ||
-                    (d.localName || d.name || '').includes('EXO')
-                  );
-                  const result = filtered.length > 0 ? filtered : devices;
-                  result.sort((a, b) => (b.RSSI || -100) - (a.RSSI || -100));
-                  resolve(result);
-                }, timeoutSec * 1000);
-              },
-              fail: () => resolve(devices),
-            });
-          } else {
-            devices.sort((a, b) => (b.RSSI || -100) - (a.RSSI || -100));
-            resolve(devices);
-          }
+        const timer = setTimeout(() => {
+          stopAndResolve();
         }, timeoutSec * 1000);
+        // 如果中途已找到目标设备，可提前结束（由调用方控制）
+        startScan._activeTimer = timer;
+        startScan._stopFn = () => {
+          clearTimeout(timer);
+          stopAndResolve();
+        };
       },
-      fail: () => {
-        uni.startBluetoothDevicesDiscovery({
-          allowDuplicatesKey: false,
-          interval: 0,
-          success: () => {
-            setTimeout(() => {
-              uni.stopBluetoothDevicesDiscovery();
-              const filtered = devices.filter(d =>
-                (d.localName || d.name || '').toUpperCase().includes('WZ-') ||
-                (d.localName || d.name || '').includes('EXO')
-              );
-              const result = filtered.length > 0 ? filtered : devices;
-              result.sort((a, b) => (b.RSSI || -100) - (a.RSSI || -100));
-              resolve(result);
-            }, timeoutSec * 1000);
-          },
-          fail: (err) => reject(err),
-        });
+      fail: (err) => {
+        cleanup();
+        reject(new Error('启动蓝牙扫描失败: ' + (err.errMsg || err.message)));
       },
     });
   });
 }
+
+// 外部可调用提前结束扫描
+startScan.stopEarly = () => {
+  if (startScan._stopFn) {
+    startScan._stopFn();
+    startScan._stopFn = null;
+  }
+  if (startScan._activeTimer) {
+    clearTimeout(startScan._activeTimer);
+    startScan._activeTimer = null;
+  }
+};
 
 // ── 当前连接的服务 UUID（从设备发现，不使用硬编码） ──
 let activeServiceId = SCAN_FILTER_UUID;
@@ -222,6 +242,11 @@ export function registerNotifyHandler(handler) {
   } else {
     onNotifyData = handler;
   }
+}
+
+// ── 清除 Notify 监听 ──
+export function clearNotifyHandler() {
+  onNotifyData = null;
 }
 
 // ── 订阅特征值 Notify（5s 超时兜底） ──

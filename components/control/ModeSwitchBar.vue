@@ -17,7 +17,7 @@
 				</view>
 				<text
 					class="mode-title"
-					:style="{ color: props.selectedModeId === mode.id ? '#fff' : '#5D5A83' }"
+					:style="{ color: props.selectedModeId === mode.id ? '#fff' : '#666' }"
 				>
 					{{ mode.title }}
 				</text>
@@ -73,12 +73,12 @@ function onSelect(mode) {
 .mode-switch-bar {
 	border-radius: 32px;
 	overflow: hidden;
-	background: rgba(255, 255, 255, 0.58);
+	background: rgba(255, 255, 255, 0.72);
 	backdrop-filter: blur(24px);
 	-webkit-backdrop-filter: blur(24px);
-	border: 1px solid rgba(255, 255, 255, 0.74);
+	border: 1px solid rgba(255, 255, 255, 0.85);
 	box-shadow:
-		0 12px 24px rgba(154, 127, 232, 0.2);
+		0 8px 20px rgba(0, 0, 0, 0.08);
 	padding: 7px;
 }
 

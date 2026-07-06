@@ -9,21 +9,19 @@
 
 		<!-- 地图区域 -->
 		<view class="map-area">
-			<map :key="mapKey" ref="mapEl" class="map-view" :latitude="mapCenter.lat" :longitude="mapCenter.lng"
-				:markers="mapMarkers" :scale="mapScale" show-location :enable-zoom="true" :enable-scroll="true"
-				@markertap="onMarkerTap" @updated="onMapUpdated">
-				<cover-view class="map-badge">{{ totalAvailable }} 台可租</cover-view>
-				<cover-view class="map-tools">
-					<cover-view class="map-tool-btn">
-						<cover-image class="map-tool-img" src="/static/operator-icon.png"></cover-image>
-					</cover-view>
-					<cover-view class="map-tool-btn">
-						<cover-image class="map-tool-img" src="/static/search-icon.png"></cover-image>
-					</cover-view>
-					<cover-view class="map-tool-btn" @click="moveToMyLocation">
-						<cover-image class="map-tool-img" src="/static/position-icon.png"></cover-image>
-					</cover-view>
-				</cover-view>
+			<map id="mapEl" ref="mapEl" class="map-view" :latitude="mapCenter.lat" :longitude="mapCenter.lng"
+				:markers="mapMarkers" :scale="mapScale" :enable-zoom="true" :enable-scroll="true"
+				:show-location="true"
+				@markertap="onMarkerTap" @regionchange="onRegionChange">
+				<view class="locate-center">
+					<image class="locate-center-img" src="/static/locate.png"></image>
+				</view>
+				<view class="map-badge">{{ totalAvailable }} 台可租</view>
+				<view class="map-tools">
+					<view class="map-tool-btn" @tap="moveToMyLocation">
+						<image class="map-tool-img" src="/static/position-icon.png"></image>
+					</view>
+				</view>
 			</map>
 		</view>
 
@@ -34,7 +32,18 @@
 				<text class="tab-label">附近设备</text>
 			</view>
 			<!-- 核心操作按钮 — 突出悬浮 -->
-			<view class="scan-main-btn" @click="onScan">
+			<!-- 已连接：显示设备信息 + 进入控制 -->
+			<view v-if="deviceStore.connected || deviceStore.leaseRunning" class="scan-main-btn" @click="goToControl">
+				<view class="scan-inner">
+					<image class="exo-icon" src="/static/exo_view1.png" mode="aspectFit"></image>
+					<view class="connected-info">
+						<text class="connected-name">{{ deviceStore.deviceName || '外骨骼设备' }}</text>
+						<text class="connected-hint">{{ deviceStore.connected ? '点击进入控制' : '点击继续体验' }}</text>
+					</view>
+				</view>
+			</view>
+			<!-- 未连接：扫码租赁 -->
+			<view v-else class="scan-main-btn" @click="onScan">
 				<view class="scan-inner">
 					<image class="scan-icon" src="/static/scan-icon.png" mode="aspectFit"></image>
 					<text class="scan-text">扫码租赁</text>
@@ -43,6 +52,48 @@
 			<view class="tab-item" @click="goToProfile">
 				<image class="tab-img" src="/static/icon-person.png" mode="aspectFit"></image>
 				<text class="tab-label">个人中心</text>
+			</view>
+		</view>
+
+		<!-- 柜机详情面板 -->
+		<view v-if="showDetailPanel" class="detail-panel-overlay" @click="closeDetailPanel">
+			<view class="detail-panel" @click.stop>
+				<view class="dp-header">
+					<text class="dp-title">{{ selectedCabinet?.cabinetName || selectedCabinet?.name || '柜机详情' }}</text>
+					<text class="dp-close" @click="closeDetailPanel">✕</text>
+				</view>
+				<view class="dp-info">
+					<text class="dp-no">编号：{{ selectedCabinet?.cabinetNo || '-' }}</text>
+					<text class="dp-address">地址：{{ selectedCabinet?.address || '-' }}</text>
+					<view class="dp-stats">
+						<text class="dp-stat">总设备：{{ selectedCabinet?.totalDevices || selectedCabinet?.totalDeviceCount || 0 }}</text>
+						<text class="dp-stat dp-available">可租：{{ selectedCabinet?.availableDevices || selectedCabinet?.availableDeviceCount || 0 }}</text>
+					</view>
+				</view>
+				<!-- 收费信息 -->
+				<view class="dp-fee">
+					<view class="dp-fee-item">
+						<text class="dp-fee-label">租金</text>
+						<text class="dp-fee-num">{{ dpFeeRate }}</text>
+						<text class="dp-fee-unit">元/分钟</text>
+					</view>
+					<view class="dp-fee-divider"></view>
+					<view class="dp-fee-item">
+						<text class="dp-fee-label">押金</text>
+						<text class="dp-fee-num">{{ dpFeeDeposit }}</text>
+						<text class="dp-fee-unit">元</text>
+					</view>
+					<view class="dp-fee-divider"></view>
+					<view class="dp-fee-item">
+						<text class="dp-fee-label">免费时长</text>
+						<text class="dp-fee-num">{{ dpFeeFreeMinutes }}</text>
+						<text class="dp-fee-unit">分钟</text>
+					</view>
+				</view>
+				<!-- 导航按钮 -->
+				<view class="dp-nav-btn" @click="goToCabinetDetail">
+					<text class="dp-nav-text">查看详情 / 导航</text>
+				</view>
 			</view>
 		</view>
 	</view>
@@ -55,141 +106,113 @@
 		onMounted
 	} from 'vue';
 	import {
+		useDeviceStore
+	} from '../../store/device.js';
+	import {
 		api
 	} from '../../services/api.js';
+	import {
+		parseDeviceQr
+	} from '../../utils/qr-parser.js';
+	import { logout } from '../../services/auth.js';
+
+	const deviceStore = useDeviceStore();
 
 	const statusBarHeight = ref(20)
-const locating = ref(false)
+	const locating = ref(false)
 	let mapContext = null
 
-	// 地图相关
-	const mapScale = ref(14)
+	// 标志：跳过由程序触发的 regionchange（如 moveToLocation 后），只响应用户手势
+	let skipNextRegionChange = false
+	const mapScale = ref(18)
 	const mapCenter = ref({
 		lat: 39.9042,
 		lng: 116.4074
 	}) // 默认北京
-	const mapKey = ref(0) // 强制刷新地图
 
-	// 用户位置
+	// 用户位置（查询中心点）
 	const myLocation = ref({
 		lat: 39.9042,
 		lng: 116.4074
 	})
 	const locationText = ref('定位')
 
-	// 附近设备点（含真实经纬度）
-	const nearbyPoints = ref([{
-			id: 1,
-			name: 'CDC康复中心',
-			lat: 39.9060,
-			lng: 116.4145,
-			distance: 320,
-			available: 3,
-			priceMin: 0.50
-		},
-		{
-			id: 2,
-			name: '奥森公园南门',
-			lat: 40.0150,
-			lng: 116.3907,
-			distance: 1200,
-			available: 2,
-			priceMin: 0.50
-		},
-		{
-			id: 3,
-			name: '朝阳大悦城',
-			lat: 39.9219,
-			lng: 116.4690,
-			distance: 2500,
-			available: 5,
-			priceMin: 0.40
-		},
-		{
-			id: 4,
-			name: '海淀医院',
-			lat: 39.9670,
-			lng: 116.3035,
-			distance: 3800,
-			available: 1,
-			priceMin: 0.60
-		},
-		{
-			id: 5,
-			name: '望京SOHO',
-			lat: 40.0020,
-			lng: 116.4797,
-			distance: 5200,
-			available: 4,
-			priceMin: 0.45
-		},
-	]);
+	// 附近柜机列表（真实接口）
+	const cabinets = ref([]);
 
-	const totalAvailable = computed(() => nearbyPoints.value.reduce((sum, p) => sum + p.available, 0));
+	// 柜机详情面板
+	const showDetailPanel = ref(false);
+	const selectedCabinet = ref(null);
 
-	// 地图 markers（用户位置 + 设备点）
+	const totalAvailable = computed(() => cabinets.value.reduce((sum, c) => sum + (c.availableDevices || c.availableDeviceCount || 0), 0));
+
+	// 地图 markers（柜机点）
 	const mapMarkers = computed(() => {
 		const markers = [];
-		// 设备点 markers
-		for (const p of nearbyPoints.value) {
+		for (const c of cabinets.value) {
+			const lat = c.latitude ?? c.lat;
+			const lng = c.longitude ?? c.lng;
+			const available = c.availableDevices || c.availableDeviceCount || 0;
+			const name = c.cabinetName || c.name || '柜机';
 			markers.push({
-				id: p.id,
-				latitude: p.lat,
-				longitude: p.lng,
+				id: c.id ?? c.cabinetNo,
+				latitude: lat,
+				longitude: lng,
 				iconPath: '/static/marker-device.png',
 				width: 32,
 				height: 40,
-				label: {
-					content: p.name,
-					color: '#28123E',
-					fontSize: 11,
-					borderRadius: 4,
-					bgColor: 'rgba(255,255,255,0.92)',
-					padding: 3,
-					textAlign: 'center',
-					anchorY: -8,
-				},
 				callout: {
-					content: `${p.name}\n可租${p.available}台 · ¥${p.priceMin.toFixed(2)}/min`,
+					content: `可租 ${available} 台`,
+					color: '#333',
 					fontSize: 12,
 					borderRadius: 8,
-					padding: 8,
-					display: 'BYCLICK',
+					bgColor: '#fff',
+					padding: 6,
+					display: 'ALWAYS',
+					textAlign: 'center',
 				},
 			});
 		}
-		// 我的位置 marker
-		markers.push({
-			id: 0,
-			latitude: myLocation.value.lat,
-			longitude: myLocation.value.lng,
-			iconPath: '/static/marker-me.png',
-			width: 24,
-			height: 24,
-			callout: {
-				content: '我的位置',
-				fontSize: 11,
-				borderRadius: 8,
-				padding: 4,
-				display: 'ALWAYS',
-			},
-		});
 		return markers;
 	});
 
-	onMounted(() => {
-		statusBarHeight.value = uni.getSystemInfoSync().statusBarHeight || 20;
-		// 延迟获取 mapContext（需等 DOM 渲染完）
+	onMounted(async () => {
+		const sys = await uni.getSystemInfo()
+		statusBarHeight.value = sys.statusBarHeight || 20
+		// 恢复租赁状态（防止返回首页丢失）
+		deviceStore.restoreLeaseInfo();
+		// 延迟创建 mapContext 并定位，确保 map 完全渲染
 		setTimeout(() => {
 			mapContext = uni.createMapContext('mapEl', null);
-		}, 200);
-		getLocation();
+			getLocation();
+		}, 400);
+
+		// 首页静默登录：无 token 时自动登录
+		const token = uni.getStorageSync('token')
+		if (!token) {
+			await doSilentLogin()
+		}
 	});
 
-	function onMapUpdated() {
-		// map 渲染完成后，如果有 mapContext，尝试 moveToLocation
-		if (mapContext && myLocation.value.lat !== 39.9042) {
-			mapContext.moveToLocation();
+	// 地图区域变化：只在拖动结束时获取中心点并查询柜机
+	function onRegionChange(e) {
+		if (skipNextRegionChange) {
+			skipNextRegionChange = false;
+			return;
+		}
+		const type = e.type || (e.detail && e.detail.type) || '';
+		if (type === 'end') {
+			if (mapContext) {
+				mapContext.getCenterLocation({
+					success: (res) => {
+						const lat = res.latitude;
+						const lng = res.longitude;
+						myLocation.value = { lat, lng };
+						mapCenter.value = { lat, lng };
+						fetchNearbyCabinets(lng, lat);
+					},
+				});
+			}
 		}
 	}
 
@@ -203,19 +226,15 @@ const locating = ref(false)
 			const setting = await new Promise((resolve) => {
 				uni.getSetting({
 					success: resolve,
-					fail: () => resolve({
-						authSetting: {}
-					})
+					fail: () => resolve({ authSetting: {} })
 				});
 			});
-			// 未授权 → 主动请求
 			if (!setting.authSetting || !setting.authSetting['scope.userLocation']) {
 				await new Promise((resolve, reject) => {
 					uni.authorize({
 						scope: 'scope.userLocation',
 						success: resolve,
 						fail: () => {
-							// 用户拒绝 → 引导打开设置
 							uni.showModal({
 								title: '需要定位权限',
 								content: '定位用于在地图上显示您的当前位置和附近设备，请授权。',
@@ -231,7 +250,6 @@ const locating = ref(false)
 				});
 			}
 		} catch (e) {
-			// 权限被拒，使用默认位置
 			handleLocationFail();
 			return;
 		}
@@ -240,31 +258,20 @@ const locating = ref(false)
 		uni.getLocation({
 			type: 'gcj02',
 			timeout: 10000,
-			success: (res) => {
-				myLocation.value = {
-					lat: res.latitude,
-					lng: res.longitude
-				};
-				mapCenter.value = {
-					lat: res.latitude,
-					lng: res.longitude
-				};
-				mapScale.value = 15;
-				updateDistances(res.latitude, res.longitude);
+			success: async (res) => {
+				const lat = res.latitude;
+				const lng = res.longitude;
+				myLocation.value = { lat, lng };
+				mapCenter.value = { lat, lng };
+				mapScale.value = 18;
 				locating.value = false;
-				// 逆地理编码获取地址名称
-				reverseGeocode(res.latitude, res.longitude);
-				// 强制地图移动到当前位置
+				reverseGeocode(lat, lng);
+				// 移动地图到当前位置（mapContext 已确保创建）
 				if (mapContext) {
-					mapContext.moveToLocation();
-				} else {
-					mapKey.value++;
+					skipNextRegionChange = true;
+					mapContext.moveToLocation({ latitude: lat, longitude: lng });
 				}
-				uni.showToast({
-					title: '已定位到当前位置',
-					icon: 'success',
-					duration: 1500
-				});
+				await fetchNearbyCabinets(lng, lat);
 			},
 			fail: (err) => {
 				console.error('getLocation fail:', err);
@@ -275,11 +282,8 @@ const locating = ref(false)
 
 	function handleLocationFail() {
 		locationText.value = '北京市 · 朝阳区';
-		mapCenter.value = {
-			lat: 39.9042,
-			lng: 116.4074
-		};
-		mapScale.value = 13;
+		mapCenter.value = { lat: 39.9042, lng: 116.4074 };
+		mapScale.value = 18;
 		locating.value = false;
 		uni.showToast({
 			title: '使用默认位置（北京）',
@@ -289,20 +293,14 @@ const locating = ref(false)
 	}
 
 	// 逆地理编码 — 通过腾讯地图 API 获取地址名称
-	// 使用前需在腾讯位置服务 https://lbs.qq.com 申请 Key，配置于 project.config.json
 	const MAP_KEY = 'YOUR_TENCENT_MAP_KEY'; // TODO: 替换为真实 Key
 
 	function reverseGeocode(lat, lng) {
-		// 显示定位中，等 API 返回真实地址
 		locationText.value = '定位中...';
-
-		// 未配置 Key 时直接显示区级友好信息
 		if (MAP_KEY === 'YOUR_TENCENT_MAP_KEY') {
 			locationText.value = '定位成功';
 			return;
 		}
-
-		// 用腾讯地图逆地理编码 API 查地址
 		uni.request({
 			url: 'https://apis.map.qq.com/ws/geocoder/v1/',
 			data: {
@@ -313,7 +311,6 @@ const locating = ref(false)
 			success: (res) => {
 				if (res.data && res.data.status === 0 && res.data.result) {
 					const comp = res.data.result.address_component;
-					// 显示到区/街道一级：如 "北京市朝阳区" 或 "朝阳区望京街道"
 					const district = comp.district ? `${comp.city || ''}${comp.district}` : '';
 					const street = comp.street || '';
 					locationText.value = street ? `${district}${street}` : district || res.data.result.address;
@@ -327,62 +324,143 @@ const locating = ref(false)
 		});
 	}
 
-	// 根据用户位置更新距离
-	function updateDistances(myLat, myLng) {
-		// Haversine 公式计算两点距离（米）
-		function haversine(lat1, lng1, lat2, lng2) {
-			const R = 6371000;
-			const dLat = (lat2 - lat1) * Math.PI / 180;
-			const dLng = (lng2 - lng1) * Math.PI / 180;
-			const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(
-				dLng / 2) ** 2;
-			return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+	// 获取附近柜机
+	async function fetchNearbyCabinets(lng, lat) {
+		try {
+			const result = await api.getNearbyCabinets({ lng, lat, radius: 5000 });
+			if (result.code === 0 || result.code === 200) {
+				cabinets.value = result.data || [];
+			} else {
+				console.warn('[Index] 获取附近柜机失败:', result.msg);
+			}
+		} catch (err) {
+			console.error('[Index] 获取附近柜机异常:', err.message || err);
 		}
-		nearbyPoints.value = nearbyPoints.value.map(p => ({
-			...p,
-			distance: haversine(myLat, myLng, p.lat, p.lng),
-		}));
-		// 按距离排序
-		nearbyPoints.value.sort((a, b) => a.distance - b.distance);
 	}
 
 	// 回到我的位置
 	function moveToMyLocation() {
-		mapCenter.value = {
-			...myLocation.value
-		};
+		locating.value = true;
+		locationText.value = '定位中...';
+		uni.getLocation({
+			type: 'gcj02',
+			timeout: 8000,
+			success: (res) => {
+				const lat = res.latitude;
+				const lng = res.longitude;
+				locating.value = false;
+				myLocation.value = { lat, lng };
+				mapCenter.value = { lat, lng };
+				mapScale.value = 18; // 重置缩放比例
+				// 移动地图到当前位置
+				if (mapContext) {
+					skipNextRegionChange = true;
+					mapContext.moveToLocation({ latitude: lat, longitude: lng });
+				}
+				fetchNearbyCabinets(lng, lat);
+			},
+			fail: () => {
+				locating.value = false;
+				uni.showToast({ title: '定位失败', icon: 'none' });
+			},
+		});
 	}
 
 	function onMarkerTap(e) {
 		const id = e.detail?.markerId || e.markerId;
 		if (!id || id === 0) return;
-		const point = nearbyPoints.value.find(p => p.id === id);
-		if (point) onPointTap(point);
+		const cabinet = cabinets.value.find(c => (c.id ?? c.cabinetNo) === id);
+		if (cabinet) openCabinetDetail(cabinet);
 	}
 
 	function formatDistance(d) {
 		return d >= 1000 ? (d / 1000).toFixed(1) + 'km' : d + 'm';
 	}
 
-	function onScan() {
+	// ── 柜机详情面板 ──
+	function openCabinetDetail(cabinet) {
+		selectedCabinet.value = cabinet;
+		showDetailPanel.value = true;
+	}
+
+	function closeDetailPanel() {
+		showDetailPanel.value = false;
+		selectedCabinet.value = null;
+	}
+
+	const dpFeeRate = computed(() => {
+		const rate = selectedCabinet.value?.rate || 0;
+		return rate > 0 ? (rate / 100).toFixed(2) : '1.00';
+	});
+	const dpFeeDeposit = computed(() => {
+		const deposit = selectedCabinet.value?.deposit || 0;
+		return deposit > 0 ? (deposit / 100).toFixed(2) : '0.00';
+	});
+	const dpFeeFreeMinutes = computed(() => {
+		return selectedCabinet.value?.freeMinutes || 0;
+	});
+
+	function goToCabinetDetail() {
+		const c = selectedCabinet.value;
+		if (!c) return;
+		closeDetailPanel();
+		const no = c.cabinetNo || c.id;
+		const lat = c.latitude || c.lat || 0;
+		const lng = c.longitude || c.lng || 0;
+		const userLat = myLocation.value.lat;
+		const userLng = myLocation.value.lng;
+		uni.navigateTo({
+			url: `/pages/cabinet/detail?cabinetNo=${no}&lat=${lat}&lng=${lng}&userLat=${userLat}&userLng=${userLng}`,
+		});
+	}
+
+	// ── 扫码：支持设备二维码自动连接 & 纯SN租赁 ──
+	async function onScan() {
 		uni.scanCode({
 			onlyFromCamera: true,
-			success: (res) => {
-				const sn = res.result;
-				uni.navigateTo({
-					url: `/pages/lease/confirm?sn=${encodeURIComponent(sn)}`
-				});
+			success: async (res) => {
+				const qr = parseDeviceQr(res.result);
+				if (qr.sn && qr.mac) {
+					// 真实流程：scan → confirm → demo-control
+					uni.showLoading({ title: '获取设备信息...', mask: true });
+					try {
+						const scanRes = await api.scanDevice(qr.sn);
+						if ((scanRes.code === 200 || scanRes.code === 0) && scanRes.data) {
+							const d = scanRes.data;
+							// 确认租借
+							const confirmRes = await api.confirmLease({ deviceSn: d.deviceSn });
+							if (confirmRes.code === 200 || confirmRes.code === 0) {
+								uni.navigateTo({
+									url: `/pages/device/demo-control?tradeNo=${d.tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(qr.name || '外骨骼设备')}&hourlyRate=${d.hourlyRate || 0}&freeMinutes=${d.freeMinutes || 0}&depositMoney=${d.depositMoney || 0}`
+								});
+							} else {
+								uni.showToast({ title: confirmRes.msg || '租借确认失败', icon: 'none' });
+							}
+						} else {
+							uni.showToast({ title: scanRes.msg || '设备信息获取失败', icon: 'none' });
+						}
+					} catch (e) {
+						uni.showToast({ title: e.message || '请求失败', icon: 'none' });
+					} finally {
+						uni.hideLoading();
+					}
+				} else if (qr.sn) {
+					// 纯 SN：走租赁确认流程
+					uni.navigateTo({
+						url: `/pages/lease/confirm?sn=${encodeURIComponent(qr.sn)}`
+					});
+				} else {
+					uni.showToast({ title: '无效二维码', icon: 'none' });
+				}
 			},
 			fail: (err) => {
 				if (err.errMsg.includes('cancel')) return;
-				uni.showToast({
-					title: '请扫描外骨骼设备二维码',
-					icon: 'none',
-					duration: 2000
-				});
+				uni.showToast({ title: '请扫描设备二维码', icon: 'none', duration: 2000 });
 			},
 		});
 	}
+
+
 
 	function goToScanning() {
 		uni.navigateTo({
@@ -391,9 +469,10 @@ const locating = ref(false)
 	}
 
 	function goToNearby() {
-		// 滑动到设备列表区域（或跳转独立页）
+		const lat = myLocation.value.lat;
+		const lng = myLocation.value.lng;
 		uni.navigateTo({
-			url: '/pages/device/scanning'
+			url: `/pages/cabinet/list?lat=${lat}&lng=${lng}`
 		})
 	}
 
@@ -403,15 +482,37 @@ const locating = ref(false)
 		})
 	}
 
-	function onPointTap(point) {
-		uni.showActionSheet({
-			itemList: [`${point.name} · 可租${point.available}台`],
-			success: () => {
-				uni.navigateTo({
-					url: `/pages/lease/confirm?sn=mock-${point.id}`
-				});
-			},
-		});
+	function goToControl() {
+		if (deviceStore.connected) {
+			uni.navigateTo({ url: '/pages/device/control' });
+		} else if (deviceStore.leaseRunning) {
+			const sn = deviceStore.leaseDeviceSn || '';
+			uni.navigateTo({
+				url: `/pages/device/demo-control?tradeNo=${deviceStore.tradeNo}&deviceSn=${sn}&name=${encodeURIComponent(deviceStore.deviceName || '外骨骼设备')}&hourlyRate=${deviceStore.leaseRate}&freeMinutes=${deviceStore.leaseFreeMinutes}&depositMoney=${deviceStore.leaseDeposit}`
+			});
+		}
+	}
+
+	// ── 首页静默登录 ──
+	async function doSilentLogin() {
+		try {
+			const loginRes = await new Promise((resolve, reject) => {
+				uni.login({ provider: 'weixin', success: resolve, fail: reject })
+			})
+			const result = await api.wxXcxLogin({ code: loginRes.code })
+			if (result.code === 200 && result.data) {
+				uni.setStorageSync('token', result.data.token)
+				if (result.data.refreshToken) {
+					uni.setStorageSync('refreshToken', result.data.refreshToken)
+				}
+				if (result.data.memberId) {
+					uni.setStorageSync('memberId', String(result.data.memberId))
+				}
+				console.log('[Index] 静默登录成功')
+			}
+		} catch (err) {
+			console.error('[Index] 静默登录失败:', err.message || err)
+		}
 	}
 
 	function showUsage() {
@@ -443,7 +544,11 @@ const locating = ref(false)
 		height: 100vh;
 		padding-bottom: 0;
 	}
-	.status-bar { background: $pageBg; flex-shrink: 0; }
+
+	.status-bar {
+		background: $pageBg;
+		flex-shrink: 0;
+	}
 
 	.top-bar {
 		@include flex-between;
@@ -488,6 +593,36 @@ const locating = ref(false)
 		height: 100%;
 	}
 
+	/* 中心定位图标：view 在 map 内部，CSS absolute 定位相对于 map 容器 */
+	.locate-center {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		margin-top: -18px;
+		margin-left: -18px;
+		width: 36px;
+		height: 36px;
+		pointer-events: none;
+	}
+	.locate-center-img {
+		width: 36px;
+		height: 36px;
+	}
+	.locate-label {
+		position: absolute;
+		top: 36px;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 11px;
+		color: $primaryColor;
+		font-weight: 700;
+		white-space: nowrap;
+		background: rgba(255,255,255,0.9);
+		padding: 2px 8px;
+		border-radius: 8px;
+		margin-top: 2px;
+	}
+
 	.map-badge {
 		position: absolute;
 		top: 10px;
@@ -515,12 +650,13 @@ const locating = ref(false)
 		width: 40px;
 		height: 40px;
 		border-radius: 12px;
-		background: #f1f2f6;
+		background:#f0f4fa;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		padding: 8px;
 		margin-bottom: 8px;
+		border: 1.4px solid #fff;
 	}
 
 	.map-tool-img {
@@ -561,12 +697,12 @@ const locating = ref(false)
 	.scan-main-btn {
 		width: 50%;
 		height: 66px;
-		background: linear-gradient(135deg, #00C9A7, #00c9a7);
+		background: linear-gradient(135deg, $primaryColor, $primaryLight);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		border-radius: 40px;
-		box-shadow: 0 -4px 20px rgba(0, 201, 167, 0.35);
+		box-shadow: 0 -4px 20px rgba(139, 92, 246, 0.35);
 		@include tap-active;
 	}
 
@@ -585,5 +721,173 @@ const locating = ref(false)
 		font-size: 18px;
 		color: #000;
 		font-weight: 800;
+	}
+
+	/* 已连接状态：复用 scan-main-btn 尺寸，统一布局 */
+	.exo-icon {
+		width: 30px;
+		height: 30px;
+		border-radius: 6px;
+		flex-shrink: 0;
+	}
+
+	.connected-info {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		min-width: 0;
+	}
+
+	.connected-name {
+		font-size: 15px;
+		font-weight: 800;
+		color: #fff;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.connected-hint {
+		font-size: 11px;
+		color: rgba(255, 255, 255, 0.8);
+	}
+
+	/* ── 柜机详情面板 ── */
+	.detail-panel-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 100;
+		background: rgba(0, 0, 0, 0.35);
+		display: flex;
+		flex-direction: column;
+		justify-content: flex-end;
+	}
+
+	.detail-panel {
+		background: #fff;
+		border-radius: 24px 24px 0 0;
+		padding: 20px 18px;
+		padding-bottom: calc(20px + env(safe-area-inset-bottom));
+		max-height: 70vh;
+		display: flex;
+		flex-direction: column;
+		animation: dp-slide-up 0.25s ease-out;
+	}
+
+	@keyframes dp-slide-up {
+		from {
+			transform: translateY(100%);
+		}
+		to {
+			transform: translateY(0);
+		}
+	}
+
+	.dp-header {
+		@include flex-between;
+		margin-bottom: 12px;
+	}
+
+	.dp-title {
+		font-size: 17px;
+		font-weight: 800;
+		color: $textMainColor;
+	}
+
+	.dp-close {
+		font-size: 18px;
+		color: #999;
+		padding: 4px 8px;
+		line-height: 1;
+	}
+
+	.dp-info {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		margin-bottom: 14px;
+		padding-bottom: 14px;
+		border-bottom: 1px solid #f0f0f0;
+	}
+
+	.dp-no {
+		font-size: 13px;
+		color: #666;
+	}
+
+	.dp-address {
+		font-size: 13px;
+		color: #666;
+	}
+
+	.dp-stats {
+		display: flex;
+		gap: 16px;
+		margin-top: 4px;
+	}
+
+	.dp-stat {
+		font-size: 13px;
+		color: #666;
+	}
+
+	.dp-available {
+		color: $primaryColor;
+		font-weight: 700;
+	}
+
+	/* 收费信息 */
+	.dp-fee {
+		display: flex;
+		align-items: center;
+		justify-content: space-around;
+		padding: 16px 0;
+		margin-top: 8px;
+		border-top: 1px solid #f0f0f0;
+	}
+
+	.dp-fee-item {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.dp-fee-label {
+		font-size: 12px;
+		color: #999;
+	}
+
+	.dp-fee-num {
+		font-size: 20px;
+		font-weight: 800;
+		color: $primaryColor;
+	}
+
+	.dp-fee-unit {
+		font-size: 11px;
+		color: #666;
+	}
+
+	.dp-fee-divider {
+		width: 1px;
+		height: 32px;
+		background: #f0f0f0;
+	}
+
+	/* 导航按钮 */
+	.dp-nav-btn {
+		margin-top: 12px;
+		padding: 14px;
+		background: linear-gradient(135deg, $primaryColor, $primaryLight);
+		border-radius: 12px;
+		text-align: center;
+		@include tap-active;
+	}
+
+	.dp-nav-text {
+		font-size: 15px;
+		font-weight: 700;
+		color: #fff;
 	}
 </style>

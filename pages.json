@@ -11,26 +11,49 @@
 			"path": "pages/lease/confirm",
 			"style": {
 				"navigationBarTitleText": "确认使用",
+				"navigationBarBackgroundColor": "#f5f6fa",
 				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/cabinet/list",
+			"style": {
+				"navigationBarTitleText": "附近柜机"
+			}
+		},
+		{
+			"path": "pages/cabinet/detail",
+			"style": {
+				"navigationBarTitleText": "柜机详情"
 			}
 		},
 		{
 			"path": "pages/device/scanning",
 			"style": {
 				"navigationBarTitleText": "设备连接",
+				"navigationBarBackgroundColor": "#f5f6fa",
 				"navigationBarTextStyle": "black"
 			}
 		},
 		{
 			"path": "pages/device/control",
 			"style": {
-				"navigationBarTitleText": "设备控制"
+				"navigationBarTitleText": "设备控制",
+				"navigationBarBackgroundColor": "#f5f6fa",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/device/demo-control",
+			"style": {
+				"navigationBarTitleText": "设备体验"
 			}
 		},
 		{
 			"path": "pages/device/completed",
 			"style": {
 				"navigationBarTitleText": "使用结束",
+				"navigationBarBackgroundColor": "#f5f6fa",
 				"navigationBarTextStyle": "black"
 			}
 		},
@@ -38,6 +61,7 @@
 			"path": "pages/history/list",
 			"style": {
 				"navigationBarTitleText": "订单",
+				"navigationBarBackgroundColor": "#f5f6fa",
 				"navigationBarTextStyle": "black"
 			}
 		},
@@ -45,20 +69,53 @@
 			"path": "pages/history/detail",
 			"style": {
 				"navigationBarTitleText": "运动报告",
+				"navigationBarBackgroundColor": "#f5f6fa",
 				"navigationBarTextStyle": "black"
 			}
 		},
 		{
 			"path": "pages/profile/my",
 			"style": {
-				"navigationBarTitleText": "我的",
-				"navigationBarTextStyle": "black"
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/profile/settings",
 			"style": {
 				"navigationBarTitleText": "身体参数",
+				"navigationBarBackgroundColor": "#f5f6fa",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/profile/deposit",
+			"style": {
+				"navigationBarTitleText": "押金管理",
+				"navigationBarBackgroundColor": "#f5f6fa",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/profile/coupon",
+			"style": {
+				"navigationBarTitleText": "我的卡券",
+				"navigationBarBackgroundColor": "#f5f6fa",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/profile/about",
+			"style": {
+				"navigationBarTitleText": "关于",
+				"navigationBarBackgroundColor": "#f5f6fa",
+				"navigationBarTextStyle": "black"
+			}
+		},
+		{
+			"path": "pages/profile/agreement",
+			"style": {
+				"navigationBarTitleText": "协议",
+				"navigationBarBackgroundColor": "#f5f6fa",
 				"navigationBarTextStyle": "black"
 			}
 		}
@@ -66,8 +123,8 @@
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "外骨骼租赁",
-		"navigationBarBackgroundColor": "#f0f4fa",
-		"backgroundColor": "#f0f4fa",
+		"navigationBarBackgroundColor": "#f5f6fa",
+		"backgroundColor": "#f5f6fa",
 		"enablePullDownRefresh": false
 	},
 	"uniIdRouter": {}

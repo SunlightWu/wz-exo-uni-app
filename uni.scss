@@ -3,10 +3,10 @@
 @import "/uni_modules/uview-next/theme.scss";
 
 // ── 覆盖 uview-next 主题色为外骨骼紫色系 ──
-$u-primary: #00C9A7;
-$u-primary-dark: #00B894;
-$u-primary-disabled: #A0EDDD;
-$u-primary-light: #E6F9F5;
+$u-primary: #8B5CF6;
+$u-primary-dark: #7C3AED;
+$u-primary-disabled: #C4B5FD;
+$u-primary-light: #F3E8FF;
 
 $u-success: #28C76F;
 $u-success-dark: #1FA85A;
@@ -31,7 +31,8 @@ $cardSoftBg: #F0E2FF;
 $borderColor: #E6D3F8;
 $textMainColor: #28123E;
 $textSubColor: #85689D;
-$primaryColor: #00C9A7;
+$primaryColor: #8B5CF6;
+$primaryLight: #A78BFA;
 $successColor: #28C76F;
 $warningColor: #FFB547;
 $dangerColor: #FF5C7A;
@@ -62,6 +63,11 @@ $radiusFull: 999px;
   align-items: center;
   justify-content: space-between;
 }
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 @mixin text-title {
   font-size: 17px;
   font-weight: 800;
@@ -74,6 +80,11 @@ $radiusFull: 999px;
 @mixin text-caption {
   font-size: 12px;
   color: $textSubColor;
+}
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 @mixin tap-active {
   transition: opacity 0.15s, background 0.15s;

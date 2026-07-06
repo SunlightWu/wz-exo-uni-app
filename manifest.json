@@ -49,17 +49,22 @@
         },
         "usingComponents" : true,
         "permission" : {
-            "scope.bluetooth" : {
-                "desc" : "蓝牙用于连接外骨骼设备"
-            },
             "scope.userLocation" : {
                 "desc" : "位置信息用于显示附近设备"
             }
         },
-        "requiredBackgroundModes" : [ "bluetooth", "location" ]
+        "requiredBackgroundModes" : [ "bluetooth", "location" ],
+        "requiredPrivateInfos" : [ "getLocation" ]
     },
     "mp-alipay" : {
-        "usingComponents" : true
+        "usingComponents" : true,
+        "appid" : "2021006170646321",
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "位置信息用于显示附近设备和运动轨迹"
+            }
+        },
+        "requiredPrivateInfos" : [ "getLocation" ]
     },
     "mp-baidu" : {
         "usingComponents" : true

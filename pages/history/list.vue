@@ -1,60 +1,59 @@
 <template>
 	<view class="order-page">
-		<!-- Tab 切换 u-tabs -->
-		<u-tabs
-			:list="tabList"
-			:current="currentTab"
-			lineColor="#6120A8"
-			:activeStyle="{ color: '#6120A8', fontWeight: '700' }"
-			:inactiveStyle="{ color: '#85689D' }"
-			@change="onTabChange"
-		></u-tabs>
+		<!-- 订单列表 -->
+		<view class="order-list">
+			<view
+				v-for="item in orders"
+				:key="item.id"
+				class="order-card"
+				@click="onOrderClick(item)"
+			>
+				<!-- 顶部：状态 + 编号 -->
+				<view class="card-header">
+					<view class="status-badge" :class="statusClass(item.state)">
+						<text class="status-text">{{ statusLabel(item.state) }}</text>
+					</view>
+					<text class="trade-no">{{ item.tradeNo }}</text>
+				</view>
 
-		<!-- 进行中的订单 -->
-		<view v-if="currentTab === 0" class="tab-content">
-			<!-- 如果有进行中的订单 -->
-			<view v-if="activeOrder" class="active-order sci-card">
-				<view class="active-header">
-					<u-tag text="使用中" type="success" size="mini" :plain="false"></u-tag>
+				<!-- 中部：设备信息 -->
+				<view class="card-body">
+					<view class="body-row">
+						<text class="body-label">设备</text>
+						<text class="body-value">{{ item.deviceSn }}</text>
+					</view>
+					<view class="body-row">
+						<text class="body-label">租借时间</text>
+						<text class="body-value">{{ formatDateTime(item.pickupTime) }}</text>
+					</view>
+					<view v-if="item.returnTime" class="body-row">
+						<text class="body-label">归还时间</text>
+						<text class="body-value">{{ formatDateTime(item.returnTime) }}</text>
+					</view>
+					<view class="body-row">
+						<text class="body-label">押金</text>
+						<text class="body-value highlight">¥{{ (item.depositMoney / 100).toFixed(2) }}</text>
+					</view>
 				</view>
-				<text class="order-device">{{ activeOrder.deviceSn }}</text>
-				<text class="order-location">{{ activeOrder.location }}</text>
-				<view class="order-meta">
-					<text class="meta-item">⏱ 剩余 {{ formatTime(activeOrder.remaining) }}</text>
-					<text class="meta-item">🚶 {{ activeOrder.steps }} 步</text>
+
+				<!-- 底部：费用 -->
+				<view class="card-footer">
+					<view class="footer-info">
+						<text class="footer-label">支付金额</text>
+						<text class="footer-cost">¥{{ (item.payMoney / 100).toFixed(2) }}</text>
+					</view>
+					<text class="footer-arrow">›</text>
 				</view>
-				<u-button type="primary" text="继续使用" shape="circle" @click="goToControl"></u-button>
 			</view>
-
-			<!-- 无进行中的订单 -->
-			<u-empty v-else mode="list" text="暂无进行中的订单" iconColor="#6120A8">
-				<template #bottom>
-					<u-button type="primary" text="扫码租赁" shape="circle" @click="goScan"></u-button>
-				</template>
-			</u-empty>
 		</view>
 
-		<!-- 历史记录 -->
-		<view v-if="currentTab === 1" class="tab-content">
-			<view v-for="item in historyList" :key="item.id" class="history-item" @click="goToDetail(item.id)">
-				<view class="history-date">
-					<text class="date-text">{{ item.date }}</text>
-					<text class="date-duration">{{ formatTime(item.duration) }}</text>
-				</view>
-				<view class="history-meta">
-					<u-tag :text="modeLabel(item.mode)" size="mini" type="info" plain></u-tag>
-					<text class="meta-steps">{{ item.steps }} 步</text>
-				</view>
-				<view class="history-cost">
-					<text class="cost-value">¥{{ item.cost.toFixed(2) }}</text>
-				</view>
+		<!-- 空状态 -->
+		<view v-if="orders.length === 0 && !loading" class="empty-wrap">
+			<text class="empty-icon">📋</text>
+			<text class="empty-title">暂无订单记录</text>
+			<view class="scan-btn" @click="goScan">
+				<text class="scan-btn-text">扫码租赁</text>
 			</view>
-
-			<u-empty v-if="historyList.length === 0" mode="data" text="暂无使用记录" iconColor="#6120A8">
-				<template #bottom>
-					<u-button type="primary" text="扫码租赁" shape="circle" @click="goScan"></u-button>
-				</template>
-			</u-empty>
 		</view>
 	</view>
 </template>
@@ -63,104 +62,227 @@
 import { ref, onMounted } from 'vue';
 import { api } from '../../services/api.js';
 
-const currentTab = ref(0)
-const activeOrder = ref(null)
-const historyList = ref([])
-
-const tabList = [
-	{ name: '进行中' },
-	{ name: '历史记录' },
-]
-
-function onTabChange(e) {
-	currentTab.value = e.index
-}
+const orders = ref([]);
+const loading = ref(true);
 
 onMounted(() => {
-	loadData()
-})
+	loadOrders();
+});
 
-function loadData() {
-	// 检查是否有进行中的租赁
-	const lease = uni.getStorageSync('currentLease')
-	if (lease) {
-		const elapsed = Math.floor((Date.now() - lease.startTime) / 1000)
-		activeOrder.value = {
-			deviceSn: lease.sn,
-			location: 'CDC康复中心 3F',
-			remaining: Math.max(0, 3600 - elapsed),
-			steps: Math.floor(elapsed * 1.03),
+async function loadOrders() {
+	loading.value = true;
+	try {
+		const res = await api.getMyOrders({ pageNum: 1, pageSize: 50 });
+		if (res.code === 200 || res.code === 0) {
+			// MyBatis Plus 分页返回 records
+			orders.value = res.data?.records || res.data?.list || [];
 		}
-	} else {
-		activeOrder.value = null
+	} catch (e) {
+		console.error('获取订单列表失败:', e.message);
+		orders.value = [];
+	} finally {
+		loading.value = false;
 	}
-
-	// 加载历史
-	api.getHistory().then(res => {
-		if (res.code === 0) {
-			historyList.value = res.data
-		}
-	})
 }
 
-function formatTime(seconds) {
-	if (!seconds) return '00:00'
-	const h = Math.floor(seconds / 3600)
-	const m = Math.floor((seconds % 3600) / 60)
-	const s = seconds % 60
-	if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-	return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+function statusLabel(state) {
+	const map = { 0: '使用中', 1: '已完成', 2: '已取消', 3: '已归还' };
+	return map[state] || '未知';
 }
 
-function modeLabel(mode) {
-	const map = { transparent: '透明模式', assist: '助力模式', training: '训练模式' }
-	return map[mode] || mode
+function statusClass(state) {
+	if (state === 0) return 'active';
+	if (state === 1 || state === 3) return 'done';
+	return 'cancel';
 }
 
-function goToControl() {
-	uni.navigateTo({ url: '/pages/device/control' })
+function onOrderClick(item) {
+	uni.navigateTo({ url: `/pages/history/detail?id=${item.tradeNo}` });
 }
 
-function goToDetail(id) {
-	uni.navigateTo({ url: `/pages/history/detail?id=${id}` })
+function formatDateTime(dt) {
+	if (!dt) return '--';
+	const d = new Date(dt);
+	const pad = (n) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function goScan() {
-	uni.switchTab({ url: '/pages/index/index' })
-	// 延迟触发扫码
+	uni.switchTab({ url: '/pages/index/index' });
 	setTimeout(() => {
-		uni.scanCode({ onlyFromCamera: true })
-	}, 300)
+		uni.scanCode({ onlyFromCamera: true });
+	}, 300);
 }
 </script>
 
 <style scoped lang="scss">
-.order-page { @include page-base; padding-top: 8px; }
-.order-page .u-tabs { margin-bottom: 4px; }
-
-.tab-content { padding: 8px 18px 40px; }
-.active-order { margin-top: 8px; padding: 18px; }
-.active-header { @include flex-row; margin-bottom: 14px; }
-.order-device { font-size: 18px; font-weight: 800; color: $textMainColor; display: block; }
-.order-location { font-size: 13px; color: $textSubColor; margin-top: 6px; display: block; }
-.order-meta {
-  @include flex-row(24px); margin: 16px 0 20px;
-  padding: 12px 16px; background: $pageBg; border-radius: 12px;
+.order-page {
+	min-height: 100vh;
+	background: #f5f6fa;
 }
-.meta-item { font-size: 13px; font-weight: 600; color: $textMainColor; }
 
-.history-item {
-  @include flex-between; padding: 18px 0;
-  border-bottom: 1px solid $borderColor;
-  @include tap-active;
-  &:last-child { border-bottom: none; }
+.order-list {
+	padding: 12px 16px 40px;
 }
-.history-date { flex: 1; }
-.date-text { font-size: 15px; font-weight: 700; color: $textMainColor; display: block; }
-.date-duration { @include text-caption; margin-top: 4px; display: block; }
-.history-meta { flex: 1; text-align: center; }
-.meta-steps { @include text-caption; margin-top: 4px; display: block; }
-.history-cost { min-width: 70px; text-align: right; }
-.cost-value { font-size: 16px; font-weight: 800; color: $primaryColor; }
+
+/* 订单卡片 */
+.order-card {
+	background: #fff;
+	border-radius: 16px;
+	padding: 16px;
+	margin-bottom: 12px;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+	transition: opacity 0.15s;
+}
+
+.order-card:active {
+	opacity: 0.7;
+}
+
+/* 头部 */
+.card-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 14px;
+}
+
+.status-badge {
+	padding: 4px 12px;
+	border-radius: 8px;
+}
+
+.status-badge.active {
+	background: rgba(139, 92, 246, 0.1);
+}
+
+.status-badge.done {
+	background: rgba(40, 199, 111, 0.1);
+}
+
+.status-badge.cancel {
+	background: rgba(153, 153, 153, 0.1);
+}
+
+.status-text {
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.status-badge.active .status-text {
+	color: $primaryColor;
+}
+
+.status-badge.done .status-text {
+	color: #28C76F;
+}
+
+.status-badge.cancel .status-text {
+	color: #999;
+}
+
+.trade-no {
+	font-size: 12px;
+	color: #bbb;
+	font-family: monospace;
+}
+
+/* 内容 */
+.card-body {
+	border-top: 1px solid #f5f6fa;
+	border-bottom: 1px solid #f5f6fa;
+	padding: 12px 0;
+}
+
+.body-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 0;
+}
+
+.body-label {
+	font-size: 13px;
+	color: #999;
+}
+
+.body-value {
+	font-size: 13px;
+	font-weight: 600;
+	color: #333;
+}
+
+.body-value.highlight {
+	color: $primaryColor;
+	font-weight: 700;
+}
+
+/* 底部 */
+.card-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding-top: 12px;
+}
+
+.footer-info {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.footer-label {
+	font-size: 12px;
+	color: #999;
+}
+
+.footer-cost {
+	font-size: 16px;
+	font-weight: 800;
+	color: $primaryColor;
+}
+
+.footer-arrow {
+	font-size: 20px;
+	color: #ccc;
+	font-weight: 300;
+}
+
+/* 空状态 */
+.empty-wrap {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding-top: 120px;
+	gap: 10px;
+}
+
+.empty-icon {
+	font-size: 52px;
+}
+
+.empty-title {
+	font-size: 15px;
+	font-weight: 600;
+	color: #999;
+}
+
+.scan-btn {
+	margin-top: 16px;
+	width: 200px;
+	padding: 14px 0;
+	background: $primaryColor;
+	border-radius: 28px;
+	text-align: center;
+}
+
+.scan-btn:active {
+	opacity: 0.8;
+}
+
+.scan-btn-text {
+	font-size: 16px;
+	font-weight: 700;
+	color: #fff;
+}
 </style>
-

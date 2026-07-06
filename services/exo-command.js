@@ -69,7 +69,6 @@ export async function sendCommand(deviceId, code, payload = {}, timeoutMs = 3000
   try {
     const buf = encodeCommand(code, payload);
     if (!buf || buf.byteLength === 0) {
-      lock.release();
       return;
     }
     console.log('[BLE] 发送命令 0x' + code.toString(16).padStart(2, '0'), '到', cmdChar, '长度', buf.byteLength, 'B');

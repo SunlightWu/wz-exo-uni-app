@@ -1,37 +1,84 @@
 <template>
 	<view class="settings-page">
-		<view class="page-padding">
-			<!-- 说明 -->
-			<view class="desc-card">
-				<text class="desc-text">参数用于优化设备助力算法，提供更贴合个人的使用体验</text>
-			</view>
+		<!-- 说明 -->
+		<view class="desc-card">
+			<text class="desc-text">参数用于优化设备助力算法，提供更贴合个人的使用体验</text>
+		</view>
 
-			<!-- 参数表单 u-form -->
-			<u-form labelPosition="left" labelWidth="90" :customStyle="{ background: '#fff', borderRadius: '24px', padding: '8px 0', border: '1.4px solid #E6D3F8' }">
-				<u-form-item label="身高(cm)">
-					<u-input v-model="form.height" type="digit" placeholder="170" inputAlign="right"></u-input>
-				</u-form-item>
-				<u-form-item label="体重(kg)">
-					<u-input v-model="form.weight" type="digit" placeholder="70" inputAlign="right"></u-input>
-				</u-form-item>
-				<u-form-item label="性别">
-					<view class="gender-selector">
-						<u-tag text="男" :type="form.gender === 'male' ? 'primary' : 'info'" size="mini" @click="form.gender = 'male'"></u-tag>
-						<u-tag text="女" :type="form.gender === 'female' ? 'primary' : 'info'" size="mini" @click="form.gender = 'female'"></u-tag>
+		<!-- 参数表单 -->
+		<view class="form-card">
+			<view class="form-item">
+				<text class="form-label">身高</text>
+				<view class="form-input-wrap">
+					<input
+						class="form-input"
+						type="digit"
+						v-model="form.height"
+						placeholder="170"
+						placeholder-class="input-placeholder"
+					/>
+					<text class="form-unit">cm</text>
+				</view>
+			</view>
+			<view class="form-divider"></view>
+			<view class="form-item">
+				<text class="form-label">体重</text>
+				<view class="form-input-wrap">
+					<input
+						class="form-input"
+						type="digit"
+						v-model="form.weight"
+						placeholder="70"
+						placeholder-class="input-placeholder"
+					/>
+					<text class="form-unit">kg</text>
+				</view>
+			</view>
+			<view class="form-divider"></view>
+			<view class="form-item">
+				<text class="form-label">性别</text>
+				<view class="gender-selector">
+					<view
+						class="gender-tag"
+						:class="{ active: form.gender === 'male' }"
+						@click="form.gender = 'male'"
+					>
+						<text class="gender-text">男</text>
 					</view>
-				</u-form-item>
-				<u-form-item label="出生年份">
-					<u-input v-model="form.birthYear" type="digit" placeholder="1990" inputAlign="right"></u-input>
-				</u-form-item>
-			</u-form>
-
-			<!-- 隐私声明 -->
-			<view class="privacy-note">
-				<text>身体参数仅用于设备配置，不会上传至服务器。</text>
+					<view
+						class="gender-tag"
+						:class="{ active: form.gender === 'female' }"
+						@click="form.gender = 'female'"
+					>
+						<text class="gender-text">女</text>
+					</view>
+				</view>
 			</view>
+			<view class="form-divider"></view>
+			<view class="form-item">
+				<text class="form-label">出生年份</text>
+				<view class="form-input-wrap">
+					<input
+						class="form-input"
+						type="number"
+						v-model="form.birthYear"
+						placeholder="1990"
+						placeholder-class="input-placeholder"
+					/>
+				</view>
+			</view>
+		</view>
 
-			<!-- 保存按钮 -->
-			<u-button type="primary" text="保存" shape="circle" size="large" @click="onSave"></u-button>
+		<!-- 隐私声明 -->
+		<view class="privacy-note">
+			<text class="privacy-text">身体参数仅用于设备配置，不会上传至服务器。</text>
+		</view>
+
+		<!-- 保存按钮 -->
+		<view class="save-section">
+			<view class="save-btn" @click="onSave">
+				<text class="save-btn-text">保存</text>
+			</view>
 		</view>
 	</view>
 </template>
@@ -67,8 +114,8 @@ function onSave() {
 	// 保存到本地
 	uni.setStorageSync('userProfile', profile)
 
-	// 尝试上传服务端
-	api.saveUserProfile(profile).catch(() => {})
+	// 尝试上传服务端（当前后端暂无此接口）
+	// api.updateXcxProfile(profile).catch(() => {})
 
 	uni.showToast({ title: '保存成功', icon: 'success' })
 	setTimeout(() => {
@@ -78,14 +125,143 @@ function onSave() {
 </script>
 
 <style scoped lang="scss">
-.settings-page { @include page-base; background: $pageBg; padding: 16px 0 40px; }
-.page-padding { padding: 0 18px; }
+.settings-page {
+	min-height: 100vh;
+	background: #f5f6fa;
+	padding: 16px 0 40px;
+}
 
-.desc-card { background: rgba(97, 32, 168, 0.06); border-radius: $radiusMd; padding: 14px 16px; margin-bottom: 16px; }
-.desc-text { font-size: 13px; color: $textSubColor; line-height: 1.5; }
+.desc-card {
+	margin: 0 16px 16px;
+	background: rgba(139, 92, 246, 0.08);
+	border-radius: 16px;
+	padding: 14px 16px;
+}
 
-.gender-selector { @include flex-row(8px); }
+.desc-text {
+	font-size: 13px;
+	color: #666;
+	line-height: 1.6;
+}
 
-.privacy-note { padding: 20px 0; text-align: center; font-size: 12px; color: $textSubColor; line-height: 1.5; }
+/* 表单卡片 */
+.form-card {
+	margin: 0 16px;
+	background: #fff;
+	border-radius: 20px;
+	padding: 8px 20px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.form-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 16px 0;
+}
+
+.form-label {
+	font-size: 15px;
+	font-weight: 600;
+	color: #333;
+	flex-shrink: 0;
+	width: 80px;
+}
+
+.form-input-wrap {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 4px;
+}
+
+.form-input {
+	font-size: 15px;
+	font-weight: 500;
+	color: #333;
+	text-align: right;
+	flex: 1;
+}
+
+.form-unit {
+	font-size: 13px;
+	color: #999;
+	font-weight: 500;
+	flex-shrink: 0;
+}
+
+.form-divider {
+	height: 1px;
+	background: #f0f0f0;
+}
+
+.input-placeholder {
+	color: #ccc;
+}
+
+/* 性别选择 */
+.gender-selector {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.gender-tag {
+	padding: 6px 20px;
+	border-radius: 20px;
+	background: #f5f6fa;
+	border: 1.5px solid transparent;
+	transition: all 0.2s;
+}
+
+.gender-tag.active {
+	background: rgba(139, 92, 246, 0.12);
+	border-color: $primaryColor;
+}
+
+.gender-text {
+	font-size: 14px;
+	font-weight: 600;
+	color: #999;
+}
+
+.gender-tag.active .gender-text {
+	color: $primaryColor;
+}
+
+/* 隐私声明 */
+.privacy-note {
+	padding: 24px 20px 0;
+	text-align: center;
+}
+
+.privacy-text {
+	font-size: 12px;
+	color: #999;
+	line-height: 1.5;
+}
+
+/* 保存按钮 */
+.save-section {
+	margin: 24px 16px 0;
+}
+
+.save-btn {
+	background: $primaryColor;
+	border-radius: 28px;
+	padding: 15px 0;
+	text-align: center;
+	transition: opacity 0.15s;
+}
+
+.save-btn:active {
+	opacity: 0.8;
+}
+
+.save-btn-text {
+	font-size: 16px;
+	font-weight: 700;
+	color: #fff;
+}
 </style>
-

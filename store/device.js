@@ -12,8 +12,8 @@ export const useDeviceStore = defineStore('device', () => {
 
   // ── 模式 ──
   const mode = ref('transparent');   // transparent | assist | training
-  const assistLevel = ref(3);
-  const impedanceLevel = ref(3);
+  const assistLevel = ref(1);
+  const impedanceLevel = ref(1);
 
   // ── 运行状态 ──
   const outputState = ref('idle');    // idle | starting | running | stopping
@@ -21,6 +21,23 @@ export const useDeviceStore = defineStore('device', () => {
   const controlsLocked = ref(false);
   const isStopping = ref(false);
   const commandLoading = ref(new Set());
+
+  // ── 保活 / 在线状态 ──
+  const alive = ref(false);
+  const online = ref(false);
+
+  // ── 首次连接需要零点校准 ──
+  const needsCalibration = ref(false);
+
+  // ── 租赁状态 ──
+  const tradeNo = ref('');           // 当前交易编号
+  const leaseDeviceSn = ref('');     // 当前租赁设备序列号
+  const leaseStartTime = ref(0);     // 租赁开始时间戳
+  const leaseCost = ref(0);          // 当前累计费用（分）
+  const leaseRunning = ref(false);   // 是否正在租赁中
+  const leaseRate = ref(0);          // 费率（分/分钟）
+  const leaseFreeMinutes = ref(0);   // 免费分钟数
+  const leaseDeposit = ref(0);       // 押金（分）
 
   // ── 设备状态（来自 FFF2 解析） ──
   const status = ref({
@@ -81,6 +98,8 @@ export const useDeviceStore = defineStore('device', () => {
     if (!val) {
       outputState.value = 'idle';
       enabled.value = false;
+      alive.value = false;
+      online.value = false;
     }
   }
 
@@ -88,6 +107,9 @@ export const useDeviceStore = defineStore('device', () => {
   function setOutputState(s) { outputState.value = s; }
   function setEnabled(v) { enabled.value = v; }
   function setControlsLocked(v) { controlsLocked.value = v; }
+  function setAlive(v) { alive.value = v; }
+  function setOnline(v) { online.value = v; }
+  function setNeedsCalibration(v) { needsCalibration.value = v; }
 
   function addCommandLoading(key) {
     commandLoading.value = new Set([...commandLoading.value, key]);
@@ -124,19 +146,71 @@ export const useDeviceStore = defineStore('device', () => {
     currentCost.value = dailyCap.value > 0 ? Math.min(cost, dailyCap.value) : cost;
   }
 
+  // ── 租赁状态操作 ──
+  function setLeaseInfo(info) {
+    tradeNo.value = info.tradeNo || '';
+    leaseDeviceSn.value = info.deviceSn || '';
+    leaseStartTime.value = info.startTime || Date.now();
+    leaseRate.value = info.rate || 100; // 默认 1元/分钟
+    leaseFreeMinutes.value = info.freeMinutes || 0;
+    leaseDeposit.value = info.deposit || 0;
+    leaseRunning.value = true;
+    if (info.deviceName) deviceName.value = info.deviceName;
+    // 持久化
+    uni.setStorageSync('leaseInfo', {
+      tradeNo: tradeNo.value,
+      deviceSn: leaseDeviceSn.value,
+      startTime: leaseStartTime.value,
+      rate: leaseRate.value,
+      freeMinutes: leaseFreeMinutes.value,
+      deposit: leaseDeposit.value,
+      deviceName: deviceName.value,
+    });
+  }
+
+  function updateLeaseCost(cost) {
+    leaseCost.value = cost;
+  }
+
+  function endLease() {
+    leaseRunning.value = false;
+    tradeNo.value = '';
+    leaseDeviceSn.value = '';
+    leaseStartTime.value = 0;
+    leaseCost.value = 0;
+    uni.removeStorageSync('leaseInfo');
+  }
+
+  function restoreLeaseInfo() {
+    const saved = uni.getStorageSync('leaseInfo');
+    if (saved && saved.tradeNo) {
+      tradeNo.value = saved.tradeNo;
+      leaseDeviceSn.value = saved.deviceSn;
+      leaseStartTime.value = saved.startTime;
+      leaseRate.value = saved.rate || 100;
+      leaseFreeMinutes.value = saved.freeMinutes || 0;
+      leaseDeposit.value = saved.deposit || 0;
+      if (saved.deviceName) deviceName.value = saved.deviceName;
+      leaseRunning.value = true;
+    }
+  }
+
   // 重置状态
   function reset() {
     deviceId.value = null;
     deviceName.value = '';
     connected.value = false;
     mode.value = 'transparent';
-    assistLevel.value = 3;
-    impedanceLevel.value = 3;
+    assistLevel.value = 1;
+    impedanceLevel.value = 1;
     outputState.value = 'idle';
     enabled.value = false;
     controlsLocked.value = false;
     isStopping.value = false;
     commandLoading.value = new Set();
+    alive.value = false;
+    online.value = false;
+    needsCalibration.value = false;
     status.value = {
       running: false, battery: 0, errorCode: 0,
       leftHipAngle: 0, rightHipAngle: 0,
@@ -146,6 +220,7 @@ export const useDeviceStore = defineStore('device', () => {
     };
     currentCost.value = 0;
     resetConnectSteps();
+    // 租赁状态不在这里重置，由 endLease 单独处理
   }
 
   return {
@@ -153,6 +228,9 @@ export const useDeviceStore = defineStore('device', () => {
     deviceId, deviceName, connected,
     mode, assistLevel, impedanceLevel,
     outputState, enabled, controlsLocked, isStopping, commandLoading,
+    alive, online, needsCalibration,
+    tradeNo, leaseDeviceSn, leaseStartTime, leaseCost, leaseRunning,
+    leaseRate, leaseFreeMinutes, leaseDeposit,
     status, modeCooldown, levelCooldown,
     currentCost, ratePerMinute, dailyCap,
     connectSteps,
@@ -161,8 +239,9 @@ export const useDeviceStore = defineStore('device', () => {
     // actions
     setDevice, setConnected,
     setMode, setOutputState, setEnabled, setControlsLocked,
+    setAlive, setOnline, setNeedsCalibration,
     addCommandLoading, removeCommandLoading, isCommandLoading,
     updateStatus, setConnectStep, resetConnectSteps,
-    updateCost, reset,
+    updateCost, setLeaseInfo, updateLeaseCost, endLease, restoreLeaseInfo, reset,
   };
 });

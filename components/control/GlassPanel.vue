@@ -22,14 +22,13 @@ const panelStyle = computed(() => ({
 
 <style scoped>
 .glass-panel {
-	background: rgba(255, 255, 255, 0.45);
+	background: rgba(255, 255, 255, 0.72);
 	backdrop-filter: blur(28px);
 	-webkit-backdrop-filter: blur(28px);
-	border: 1.2px solid rgba(255, 255, 255, 0.85);
+	border: 1.2px solid rgba(255, 255, 255, 0.9);
 	box-shadow:
-		0 12px 28px rgba(154, 85, 246, 0.12),
-		0 10px 24px rgba(0, 0, 0, 0.08),
-		0 -2px 8px rgba(255, 255, 255, 0.6);
+		0 12px 28px rgba(0, 0, 0, 0.06),
+		0 4px 12px rgba(0, 0, 0, 0.04);
 	position: relative;
 	overflow: hidden;
 }

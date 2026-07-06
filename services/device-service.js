@@ -9,7 +9,7 @@ import {
 import { createThrottle } from '../utils/throttle.js';
 import {
   initBluetooth, startScan, connectDevice,
-  subscribeNotify, registerNotifyHandler,
+  subscribeNotify, registerNotifyHandler, clearNotifyHandler,
   writeCharacteristic, disconnect,
   onConnectionStateChange, closeBluetooth,
 } from './ble.js';
@@ -21,6 +21,66 @@ const throttleSensor = createThrottle(250);
 
 // ── 连接断开监听是否已注册 ──
 let connectionMonitorRegistered = false;
+
+// ── 保活机制 ──
+// 逻辑：连接成功后启动 20s 空闲倒计时；20s 内无用户操作则每 20s 发送一次 setMode 保活
+let _keepAliveIdleTimer = null;
+let _keepAlivePeriodicTimer = null;
+const KEEP_ALIVE_IDLE_MS = 20 * 1000;
+const KEEP_ALIVE_INTERVAL_MS = 20 * 1000;
+
+function _sendKeepAlive() {
+  const store = useDeviceStore();
+  if (!store.connected || store.status.errorCode !== 0) return;
+  try {
+    sendCommandWithoutAck(store.deviceId, CMD.setMode, { mode: store.mode });
+    console.log('[KeepAlive] 发送保活 setMode');
+  } catch (e) {
+    console.warn('[KeepAlive] 保活发送失败:', e);
+  }
+}
+
+function _startPeriodicKeepAlive() {
+  _keepAlivePeriodicTimer && clearInterval(_keepAlivePeriodicTimer);
+  _keepAlivePeriodicTimer = setInterval(_sendKeepAlive, KEEP_ALIVE_INTERVAL_MS);
+  console.log('[KeepAlive] 启动周期性保活');
+}
+
+export function resetKeepAliveIdle() {
+  const store = useDeviceStore();
+  if (!store.connected) return;
+  _keepAliveIdleTimer && clearTimeout(_keepAliveIdleTimer);
+  _keepAlivePeriodicTimer && clearInterval(_keepAlivePeriodicTimer);
+  _keepAlivePeriodicTimer = null;
+  _keepAliveIdleTimer = setTimeout(() => {
+    _startPeriodicKeepAlive();
+  }, KEEP_ALIVE_IDLE_MS);
+}
+
+function _stopKeepAlive() {
+  _keepAliveIdleTimer && clearTimeout(_keepAliveIdleTimer);
+  _keepAlivePeriodicTimer && clearInterval(_keepAlivePeriodicTimer);
+  _keepAliveIdleTimer = null;
+  _keepAlivePeriodicTimer = null;
+  console.log('[KeepAlive] 停止保活');
+}
+
+// ── Alive 检测 ──
+// 设备通过 log 通道发送 alive 消息，10s 内未收到则认为离线
+let _aliveTimer = null;
+const ALIVE_TIMEOUT_MS = 10 * 1000;
+
+function _markAlive() {
+  const store = useDeviceStore();
+  store.setAlive(true);
+  store.setOnline(true);
+  _aliveTimer && clearTimeout(_aliveTimer);
+  _aliveTimer = setTimeout(() => {
+    store.setAlive(false);
+    store.setOnline(false);
+    console.warn('[Alive] 设备 10s 未响应，标记为离线');
+  }, ALIVE_TIMEOUT_MS);
+}
 
 // ── 设置 Notify 处理器 ──
 export function setupNotifyHandlers() {
@@ -62,6 +122,18 @@ export function setupNotifyHandlers() {
       if (!throttleSensor()) return;
       // 传感器数据可用于更精细的展示，暂仅限流接收
     }
+
+    // FFF6: 日志 / alive 心跳
+    if (charId.toUpperCase().includes('FFF6')) {
+      try {
+        const text = new TextDecoder('utf-8').decode(value).toLowerCase();
+        if (text.includes('alive')) {
+          _markAlive();
+        }
+      } catch (e) {
+        // 解码失败静默忽略
+      }
+    }
   });
 }
 
@@ -73,8 +145,20 @@ function ensureConnectionMonitor() {
     const store = useDeviceStore();
     if (!connected && store.deviceId === deviceId) {
       console.warn('[BLE] 设备意外断开:', deviceId);
+
+      // 对标 Flutter _bindTunnelStreams: 停止保活、结束 session、重置状态
+      _stopKeepAlive();
+      _aliveTimer && clearTimeout(_aliveTimer);
+      _aliveTimer = null;
+
+      if (store.leaseRunning) {
+        store.endLease();
+      }
+
       store.reset();
       resetAckLock();
+      clearNotifyHandler();
+
       uni.showModal({
         title: '连接已断开',
         content: '设备连接已中断，请重新连接',
@@ -167,6 +251,12 @@ export async function connectAndConfigure(deviceInfo, userProfile = {}, onStep =
   step('设备就绪');
   store.setConnectStep(3, true);
   store.setOutputState('ready');
+  store.setConnected(true);
+  store.setOnline(true);
+  store.setNeedsCalibration(true);
+
+  // 启动保活空闲倒计时
+  resetKeepAliveIdle();
 }
 
 // ── 开始运行 ──
@@ -259,11 +349,32 @@ export async function clearFault() {
 }
 
 // ── 断开连接 ──
+// 对齐 Flutter: DeviceController.disconnectDevice() + BleService.disconnect()
 export async function disconnectDevice() {
   const store = useDeviceStore();
+
+  // 1. 停止保活与 alive 检测
+  _stopKeepAlive();
+  _aliveTimer && clearTimeout(_aliveTimer);
+  _aliveTimer = null;
+
+  // 2. 结束租赁（对标 Flutter _finalizeSession）
+  if (store.leaseRunning) {
+    store.endLease();
+  }
+
+  // 3. 重置 ACK 锁，防止等待中的 ACK 阻塞后续连接
+  resetAckLock();
+
+  // 4. 断开 BLE 连接
   if (store.deviceId) {
     await disconnect(store.deviceId);
   }
+
+  // 5. 清除 notify 回调，防止旧数据干扰（对标 Flutter 取消订阅）
+  clearNotifyHandler();
+
+  // 6. 重置设备状态
   store.reset();
 }
 
