@@ -42,10 +42,12 @@
     },
     "quickapp" : {},
     "mp-weixin" : {
-        "appid" : "wxfd45cb1d528a4da6",
+        "appid" : "wx4f5ef6805ba4962d",
         "setting" : {
             "urlCheck" : false,
-            "enable-backdrop-filter" : true
+            "enable-backdrop-filter" : true,
+            "minified" : true,
+            "postcss" : true
         },
         "usingComponents" : true,
         "permission" : {

@@ -1,253 +1,457 @@
 <template>
 	<view class="detail-page">
-		<!-- 时间地点 -->
-		<view class="header-info">
-			<text class="date-text">{{ report.date }}</text>
-			<text class="duration-text">{{ formatTime(report.duration) }}</text>
-			<text class="location-text">{{ report.location }} · {{ report.deviceSn }}</text>
+		<!-- 顶部状态 -->
+		<view class="status-header">
+			<view class="status-icon-wrap" :style="{ background: statusConfig.bg }">
+				<u-icon :name="statusConfig.icon" :color="statusConfig.color" size="48"></u-icon>
+			</view>
+			<text class="status-title">{{ statusConfig.label }}</text>
+			<text class="status-subtitle">{{ statusConfig.subtitle }}</text>
 		</view>
 
-		<!-- 运动轨迹 -->
-		<view class="card" v-if="trajectoryPoints.length > 0">
-			<text class="card-title">📍 运动轨迹</text>
-			<TrajectoryMap :points="trajectoryPoints" height="200px" :show-location="false" />
-		</view>
-
-		<!-- 运动概况 -->
-		<view class="card">
-			<text class="card-title">运动概况</text>
-			<view class="overview-grid">
-				<view class="overview-item">
-					<text class="ov-label">总步数</text>
-					<text class="ov-value">{{ report.steps.toLocaleString() }}</text>
-				</view>
-				<view class="overview-item">
-					<text class="ov-label">总时长</text>
-					<text class="ov-value">{{ formatTime(report.duration) }}</text>
-				</view>
-				<view class="overview-item">
-					<text class="ov-label">平均速度</text>
-					<text class="ov-value">{{ report.avgSpeed }} km/h</text>
-				</view>
-				<view class="overview-item">
-					<text class="ov-label">消耗热量</text>
-					<text class="ov-value">{{ report.calories }} kcal</text>
-				</view>
-				<view class="overview-item full-width">
-					<text class="ov-label">平均对称性</text>
-					<text class="ov-value symmetry">{{ report.symmetry }}%</text>
-					<view class="symmetry-bar">
-						<view class="symmetry-fill" :style="{ width: report.symmetry + '%' }"></view>
-					</view>
-				</view>
+		<!-- 费用概览 -->
+		<view class="cost-overview" v-if="order.payMoney > 0 || order.depositMoney > 0">
+			<view class="cost-main">
+				<text class="cost-label">{{ order.status === 3 ? '实付租金' : '应付金额' }}</text>
+				<text class="cost-amount">¥{{ ((order.payMoney || order.incomeMoney || 0) / 100).toFixed(2) }}</text>
+			</view>
+			<view v-if="order.depositMoney > 0" class="cost-deposit">
+				<text>押金 ¥{{ (order.depositMoney / 100).toFixed(2) }} 已抵扣</text>
+			</view>
+			<view v-if="depositRefund > 0" class="cost-refund">
+				<text>退还押金 ¥{{ depositRefund.toFixed(2) }}</text>
 			</view>
 		</view>
 
-		<!-- 模式分布 -->
-		<view class="card">
-			<text class="card-title">📈 模式分布</text>
-			<view v-for="(pct, mode) in report.modeDistribution" :key="mode" class="mode-bar-row">
-				<text class="mode-bar-label">{{ modeLabel(mode) }}</text>
-				<view class="mode-bar-track">
-					<view class="mode-bar-fill" :style="{ width: pct + '%', background: modeColor(mode) }"></view>
-				</view>
-				<text class="mode-bar-pct">{{ pct }}%</text>
+		<!-- 设备信息 -->
+		<view class="info-card">
+			<view class="card-header">
+				<u-icon name="setting-fill" color="#306afc" size="16"></u-icon>
+				<text class="card-title">设备信息</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">设备名称</text>
+				<text class="info-value">{{ order.deviceName || '-' }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">设备编号</text>
+				<text class="info-value mono">{{ order.deviceSn || '-' }}</text>
 			</view>
 		</view>
 
-		<!-- 步数趋势 -->
-		<view class="card">
-			<text class="card-title">📉 步数趋势</text>
-			<view class="trend-chart">
-				<view v-for="(val, i) in trendData" :key="i" class="trend-bar" :style="{ height: (val / maxTrend * 120) + 'px' }">
-					<view class="trend-bar-inner" :style="{ height: '100%' }"></view>
-				</view>
+		<!-- 订单信息 -->
+		<view class="info-card">
+			<view class="card-header">
+				<u-icon name="file-text-fill" color="#306afc" size="16"></u-icon>
+				<text class="card-title">订单信息</text>
 			</view>
-			<view class="trend-labels">
-				<text class="trend-label">开始</text>
-				<text class="trend-label">结束</text>
+			<view class="info-row">
+				<text class="info-label">订单编号</text>
+				<text class="info-value mono">{{ order.tradeNo || '-' }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">订单状态</text>
+				<text class="info-value" :style="{ color: statusConfig.color }">{{ statusConfig.label }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">支付方式</text>
+				<text class="info-value">{{ payTypeText }}</text>
+			</view>
+			<view class="info-row" v-if="order.payScene">
+				<text class="info-label">支付场景</text>
+				<text class="info-value">{{ paySceneText }}</text>
+			</view>
+			<view class="info-row" v-if="order.feeTemplateId">
+				<text class="info-label">计费模板</text>
+				<text class="info-value">#{{ order.feeTemplateId }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">创建时间</text>
+				<text class="info-value">{{ formatDateTime(order.createTime) }}</text>
 			</view>
 		</view>
 
-		<!-- 关节对称性 -->
-		<view class="card">
-			<text class="card-title">🦵 关节对称性</text>
-			<text class="symmetry-main">平均对称性: {{ report.symmetry }}%</text>
-			<view class="symmetry-legs">
-				<view class="leg-bar">
-					<text class="leg-label">左步幅</text>
-					<view class="leg-track">
-						<view class="leg-fill left" :style="{ width: leftStride + '%' }"></view>
-					</view>
-					<text class="leg-value">{{ leftStride }}%</text>
-				</view>
-				<view class="leg-bar">
-					<text class="leg-label">右步幅</text>
-					<view class="leg-track">
-						<view class="leg-fill right" :style="{ width: rightStride + '%' }"></view>
-					</view>
-					<text class="leg-value">{{ rightStride }}%</text>
-				</view>
+		<!-- 时间信息 -->
+		<view class="info-card">
+			<view class="card-header">
+				<u-icon name="clock-fill" color="#306afc" size="16"></u-icon>
+				<text class="card-title">时间信息</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">开始时间</text>
+				<text class="info-value">{{ formatDateTime(order.pickupTime) }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">结束时间</text>
+				<text class="info-value">{{ formatDateTime(order.returnTime) }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">使用时长</text>
+				<text class="info-value highlight">{{ formatDuration(order.pickupTime, order.returnTime) }}</text>
 			</view>
 		</view>
+
+		<!-- 机柜信息 -->
+		<view class="info-card">
+			<view class="card-header">
+				<u-icon name="grid-fill" color="#306afc" size="16"></u-icon>
+				<text class="card-title">机柜信息</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">取机柜</text>
+				<text class="info-value">{{ order.pickupCabinetId ? '柜机 #' + order.pickupCabinetId : '-' }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">还机柜</text>
+				<text class="info-value">{{ order.returnCabinetId ? '柜机 #' + order.returnCabinetId : '-' }}</text>
+			</view>
+		</view>
+
+		<!-- 费用明细 -->
+		<view class="info-card">
+			<view class="card-header">
+				<u-icon name="rmb-circle-fill" color="#306afc" size="16"></u-icon>
+				<text class="card-title">费用明细</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">押金</text>
+				<text class="info-value">¥{{ (order.depositMoney / 100).toFixed(2) }}</text>
+			</view>
+			<view class="info-row" v-if="order.riskAmount > 0">
+				<text class="info-label">风险冻结</text>
+				<text class="info-value">¥{{ (order.riskAmount / 100).toFixed(2) }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">实际租金</text>
+				<text class="info-value">¥{{ ((order.payMoney || 0) / 100).toFixed(2) }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">实付金额</text>
+				<text class="info-value">¥{{ ((order.incomeMoney || 0) / 100).toFixed(2) }}</text>
+			</view>
+			<view class="cost-divider"></view>
+			<view class="info-row total">
+				<text class="info-label">费用合计</text>
+				<text class="info-value total-price">¥{{ ((order.payMoney || order.incomeMoney || 0) / 100).toFixed(2) }}</text>
+			</view>
+			<view v-if="depositRefund > 0" class="info-row">
+				<text class="info-label">押金退还</text>
+				<text class="info-value refund">+¥{{ depositRefund.toFixed(2) }}</text>
+			</view>
+		</view>
+
+		<!-- 位置信息 -->
+		<view class="info-card" v-if="order.longitude && order.latitude">
+			<view class="card-header">
+				<u-icon name="map-fill" color="#306afc" size="16"></u-icon>
+				<text class="card-title">归还位置</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">经度</text>
+				<text class="info-value mono">{{ order.longitude }}</text>
+			</view>
+			<view class="info-row">
+				<text class="info-label">纬度</text>
+				<text class="info-value mono">{{ order.latitude }}</text>
+			</view>
+		</view>
+
+		<view style="height: 20px;"></view>
 	</view>
 </template>
 
 <script setup>
-import { reactive, computed, onMounted, ref } from 'vue';
+import { reactive, computed, onMounted } from 'vue';
 import { api } from '../../services/api.js';
-import TrajectoryMap from '../../components/TrajectoryMap.vue';
 
-const report = reactive({
-	id: '',
-	date: '',
-	duration: 0,
-	steps: 0,
-	avgSpeed: 0,
-	calories: 0,
-	symmetry: 0,
-	modeDistribution: { transparent: 0, assist: 0, training: 0 },
-	cost: 0,
-	location: '',
+const order = reactive({
+	tradeNo: '',
 	deviceSn: '',
+	deviceName: '',
+	memberId: '',
+	depositMoney: 0,
+	riskAmount: 0,
+	payMoney: 0,
+	incomeMoney: 0,
+	hourlyRate: 0,
+	freeMinutes: 0,
+	payType: 1,
+	payScene: '',
+	feeTemplateId: 0,
+	status: 3,
+	pickupCabinetId: 0,
+	returnCabinetId: 0,
+	pickupTime: '',
+	returnTime: '',
+	createTime: '',
+	longitude: 0,
+	latitude: 0,
 })
 
-const trendData = [12, 28, 45, 38, 52, 48, 63, 55, 42, 58, 50, 35]
-const maxTrend = Math.max(...trendData)
+const statusConfig = computed(() => {
+	const map = {
+		0: { label: '待付押金', title: '等待支付', subtitle: '请完成押金支付后开始使用', icon: 'clock-fill', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+		1: { label: '租赁中', title: '正在使用', subtitle: '设备租借中，请安全使用', icon: 'play-right-fill', color: '#306afc', bg: 'rgba(48,106,252,0.1)' },
+		2: { label: '已归还待结算', title: '已归还', subtitle: '免押订单，系统将自动扣费', icon: 'clock-fill', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+		3: { label: '已完成', title: '使用结束', subtitle: '订单已完成，感谢您的使用', icon: 'checkmark-circle-fill', color: '#28c76f', bg: 'rgba(40,199,111,0.1)' },
+		4: { label: '已取消', title: '订单已取消', subtitle: '订单已被取消', icon: 'close-circle-fill', color: '#999', bg: 'rgba(153,153,153,0.1)' },
+		5: { label: '故障中止', title: '故障中止', subtitle: '设备故障，订单已中止', icon: 'warning-fill', color: '#ff4d4f', bg: 'rgba(255,77,79,0.1)' },
+		6: { label: '丢失赔付', title: '丢失赔付', subtitle: '设备丢失，赔付已完结', icon: 'info-circle-fill', color: '#ff4d4f', bg: 'rgba(255,77,79,0.1)' },
+	};
+	return map[order.status] || map[3];
+});
 
-const leftStride = computed(() => Math.round((100 - report.symmetry) / 2 + (report.symmetry - 50)))
-const rightStride = computed(() => 100 - leftStride.value)
+const payTypeText = computed(() => {
+	const map = { 1: '微信支付', 2: '支付宝', 3: '钱包余额' };
+	return map[order.payType] || '未知';
+});
 
-// 轨迹数据
-const trajectoryPoints = ref([])
+const paySceneText = computed(() => {
+	const map = {
+		AUTH_FREEZE: '免押预授权',
+		DEPOSIT_PAY: '押金缴纳',
+		LEASE_DEDUCT: '租金扣费',
+		LOSS_COMPENSATE: '丢失赔付',
+	};
+	return map[order.payScene] || order.payScene || '-';
+});
+
+const depositRefund = computed(() => {
+	if (order.depositMoney > 0 && order.payMoney > 0) {
+		const refund = order.depositMoney - order.payMoney;
+		return refund > 0 ? refund / 100 : 0;
+	}
+	return 0;
+});
 
 onMounted(() => {
-	const pages = getCurrentPages()
-	const currentPage = pages[pages.length - 1]
-	const query = currentPage.options || currentPage.$page?.options || currentPage.$route?.query || {}
-	const id = query.id || ''
+	const pages = getCurrentPages();
+	const currentPage = pages[pages.length - 1];
+	const query = currentPage.options || currentPage.$page?.options || currentPage.$route?.query || {};
+	const id = query.id || '';
 
-	if (id && id !== 'latest') {
-		// 调用真实接口获取订单详情
-		api.getLeaseStatusByTradeNo(id).then(res => {
-			if ((res.code === 200 || res.code === 0) && res.data) {
-				const d = res.data
-				report.id = d.tradeNo
-				report.date = d.pickupTime ? new Date(d.pickupTime).toLocaleDateString() : ''
-				report.duration = d.duration || 0
-				report.cost = (d.actualCost || 0) / 100
-				report.deviceSn = d.deviceSn || ''
-				report.location = d.placeName || ''
-				// 查询设备轨迹
-				loadTrajectory(d.deviceSn)
-			}
-		}).catch(() => {})
+	if (id) {
+		loadOrderDetail(id);
 	}
 })
 
-// 查询设备轨迹
-async function loadTrajectory(deviceSn) {
-	if (!deviceSn) return
+async function loadOrderDetail(tradeNo) {
 	try {
-		const res = await api.getTrajectoryList(deviceSn)
-		if ((res.code === 200 || res.code === 0) && Array.isArray(res.data)) {
-			trajectoryPoints.value = res.data.map(p => ({
-				latitude: parseFloat(p.latitude),
-				longitude: parseFloat(p.longitude),
-				timestamp: p.reportTime || p.createTime,
-			}))
+		const res = await api.getLeaseStatusByTradeNo(tradeNo);
+		if ((res.code === 200 || res.code === 0) && res.data) {
+			const d = res.data;
+			order.tradeNo = d.tradeNo || '';
+			order.deviceSn = d.deviceSn || '';
+			order.deviceName = d.deviceName || '';
+			order.memberId = d.memberId || '';
+			order.depositMoney = d.depositMoney || 0;
+			order.riskAmount = d.riskAmount || 0;
+			order.payMoney = d.payMoney || 0;
+			order.incomeMoney = d.incomeMoney || 0;
+			order.hourlyRate = d.hourlyRate || 0;
+			order.freeMinutes = d.freeMinutes || 0;
+			order.payType = d.payType || 1;
+			order.payScene = d.payScene || '';
+			order.feeTemplateId = d.feeTemplateId || 0;
+			order.status = d.status ?? 3;
+			order.pickupCabinetId = d.pickupCabinetId || 0;
+			order.returnCabinetId = d.returnCabinetId || 0;
+			order.pickupTime = d.pickupTime || '';
+			order.returnTime = d.returnTime || '';
+			order.createTime = d.createTime || '';
+			order.longitude = d.longitude || 0;
+			order.latitude = d.latitude || 0;
 		}
 	} catch (e) {
-		console.warn('[Trajectory] 查询轨迹失败:', e.message)
+		console.error('获取订单详情失败:', e);
+		uni.showToast({ title: '获取订单详情失败', icon: 'none' });
 	}
 }
 
-function modeLabel(mode) {
-	const map = { transparent: '透明', assist: '助力', training: '训练', all: '全部' }
-	return map[mode] || mode
+function formatDateTime(dt) {
+	if (!dt) return '-';
+	const d = new Date(dt);
+	if (isNaN(d.getTime())) return dt;
+	const pad = (n) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-function modeColor(mode) {
-	const colors = { transparent: '$primaryColor', assist: '#5D8EF0', training: '#FF9F43' }
-	return colors[mode] || '#888'
-}
-
-function formatTime(seconds) {
-	const m = Math.floor(seconds / 60)
-	const s = seconds % 60
-	return `${m}分${s}秒`
+function formatDuration(start, end) {
+	if (!start || !end) return '-';
+	const s = new Date(start).getTime();
+	const e = new Date(end).getTime();
+	if (isNaN(s) || isNaN(e)) return '-';
+	const diff = Math.floor((e - s) / 1000);
+	const h = Math.floor(diff / 3600);
+	const m = Math.floor((diff % 3600) / 60);
+	const sec = diff % 60;
+	if (h > 0) return `${h}小时${m}分${sec}秒`;
+	if (m > 0) return `${m}分${sec}秒`;
+	return `${sec}秒`;
 }
 </script>
 
 <style scoped lang="scss">
 .detail-page {
 	min-height: 100vh;
-	background: #f5f6fa;
-	padding: 16px 16px 40px;
+	background: $pageBg;
+	padding: 24px 16px 0;
 }
 
-.header-info { text-align: center; padding: 16px 0 20px; }
-.date-text { font-size: 20px; font-weight: 900; color: #333; display: block; }
-.duration-text { font-size: 14px; color: #999; margin-top: 4px; display: block; }
-.location-text { font-size: 13px; color: #999; margin-top: 2px; display: block; }
+/* 顶部状态 */
+.status-header {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 8px 0 4px;
+}
 
-/* 通用卡片 */
-.card {
-	background: #fff;
-	border-radius: 20px;
-	padding: 18px 20px;
+.status-icon-wrap {
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	margin-bottom: 14px;
-	box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+}
+
+.status-title {
+	font-size: 22px;
+	font-weight: 900;
+	color: $textMainColor;
+}
+
+.status-subtitle {
+	font-size: 13px;
+	color: $textSubColor;
+	margin-top: 6px;
+}
+
+/* 费用概览 */
+.cost-overview {
+	margin-top: 16px;
+	background: linear-gradient(135deg, #306afc 0%, #5d8eff 100%);
+	border-radius: $radiusMd;
+	padding: 20px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	color: #fff;
+}
+
+.cost-main {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.cost-label {
+	font-size: 13px;
+	opacity: 0.85;
+}
+
+.cost-amount {
+	font-size: 36px;
+	font-weight: 900;
+	margin-top: 4px;
+}
+
+.cost-deposit {
+	font-size: 12px;
+	opacity: 0.75;
+	margin-top: 6px;
+}
+
+.cost-refund {
+	font-size: 12px;
+	opacity: 0.9;
+	margin-top: 4px;
+	background: rgba(255, 255, 255, 0.2);
+	padding: 2px 10px;
+	border-radius: 10px;
+}
+
+/* 信息卡片 */
+.info-card {
+	margin-top: 12px;
+	background: #fff;
+	border-radius: $radiusMd;
+	padding: 14px 16px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.card-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 10px;
 }
 
 .card-title {
+	font-size: 15px;
 	font-weight: 800;
-	font-size: 16px;
+	color: $textMainColor;
+}
+
+.info-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 14px;
+	padding: 8px 0;
+	border-bottom: 1px solid #f8f8f8;
+}
+
+.info-row:last-child {
+	border-bottom: none;
+}
+
+.info-label {
+	color: #999;
+}
+
+.info-value {
 	color: #333;
-	display: block;
-	margin-bottom: 14px;
+	font-weight: 600;
+	max-width: 60%;
+	text-align: right;
+	word-break: break-all;
 }
 
-/* 运动概况 */
-.overview-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-.overview-item {
-	width: calc(50% - 6px);
-	text-align: center;
-	padding: 12px;
-	background: #f5f6fa;
-	border-radius: 14px;
-	box-sizing: border-box;
-	&.full-width { width: 100%; }
+.info-value.mono {
+	font-family: monospace;
+	font-size: 12px;
 }
-.ov-label { font-size: 12px; font-weight: 600; color: #999; display: block; margin-bottom: 4px; }
-.ov-value { font-size: 20px; font-weight: 900; color: $primaryColor;
-	&.symmetry { color: #5D8EF0; }
+
+.info-value.highlight {
+	color: $primaryColor;
+	font-weight: 800;
 }
-.symmetry-bar { height: 6px; border-radius: 3px; background: #eee; margin-top: 8px; }
-.symmetry-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, $primaryColor, #5D8EF0); }
 
-/* 模式分布 */
-.mode-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.mode-bar-label { width: 40px; font-size: 13px; font-weight: 600; color: #333; }
-.mode-bar-track { flex: 1; height: 12px; border-radius: 6px; background: #f5f6fa; overflow: hidden; }
-.mode-bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s; }
-.mode-bar-pct { width: 36px; font-size: 13px; font-weight: 700; color: #999; text-align: right; }
-
-/* 步数趋势 */
-.trend-chart { display: flex; align-items: flex-end; gap: 4px; height: 130px; padding: 10px 0; }
-.trend-bar { flex: 1; border-radius: 3px 3px 0 0; background: #f0f0f0; position: relative; }
-.trend-bar-inner { width: 100%; border-radius: 3px 3px 0 0; background: linear-gradient(180deg, $primaryLight, $primaryColor); }
-.trend-labels { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
-.trend-label { font-size: 11px; color: #999; }
-
-/* 关节对称性 */
-.symmetry-main { font-size: 16px; font-weight: 800; color: #333; text-align: center; margin-bottom: 16px; display: block; }
-.leg-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.leg-label { width: 50px; font-size: 13px; font-weight: 600; color: #333; }
-.leg-track { flex: 1; height: 10px; border-radius: 5px; background: #f5f6fa; overflow: hidden; }
-.leg-fill { height: 100%; border-radius: 5px;
-	&.left { background: $primaryColor; }
-	&.right { background: #5D8EF0; }
+.info-value.refund {
+	color: #28c76f;
 }
-.leg-value { width: 40px; font-size: 13px; font-weight: 700; text-align: right; color: #333; }
+
+.info-value.total-price {
+	color: $dangerColor;
+	font-size: 16px;
+	font-weight: 800;
+}
+
+.info-row.total {
+	font-size: 15px;
+	font-weight: 800;
+	padding: 10px 0;
+}
+
+.info-row.total .info-label {
+	color: $textMainColor;
+}
+
+.cost-divider {
+	height: 1px;
+	background: #eee;
+	margin: 6px 0;
+}
 </style>

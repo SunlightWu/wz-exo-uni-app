@@ -16,7 +16,7 @@
 				<view class="locate-center">
 					<image class="locate-center-img" src="/static/locate.png"></image>
 				</view>
-				<view class="map-badge">{{ totalAvailable }} 台可租</view>
+				<view class="map-badge">附近 {{ totalAvailable }} 台可租</view>
 				<view class="map-tools">
 					<view class="map-tool-btn" @tap="moveToMyLocation">
 						<image class="map-tool-img" src="/static/position-icon.png"></image>
@@ -24,78 +24,117 @@
 				</view>
 			</map>
 		</view>
+		<view style="height:240px" class="">
+			
+		</view>
 
-		<!-- 底部自定义导航栏 -->
-		<view class="custom-tabbar">
-			<view class="tab-item" @click="goToNearby">
-				<image class="tab-img" src="/static/nearby-devices-icon.png" mode="aspectFit"></image>
-				<text class="tab-label">附近设备</text>
-			</view>
-			<!-- 核心操作按钮 — 突出悬浮 -->
-			<!-- 已连接：显示设备信息 + 进入控制 -->
-			<view v-if="deviceStore.connected || deviceStore.leaseRunning" class="scan-main-btn" @click="goToControl">
-				<view class="scan-inner">
-					<image class="exo-icon" src="/static/exo_view1.png" mode="aspectFit"></image>
-					<view class="connected-info">
-						<text class="connected-name">{{ deviceStore.deviceName || '外骨骼设备' }}</text>
-						<text class="connected-hint">{{ deviceStore.connected ? '点击进入控制' : '点击继续体验' }}</text>
-					</view>
+		<!-- 租赁中悬浮状态卡片 -->
+		<view v-if="deviceStore.leaseRunning" class="lease-float-card" @click="goToLeaseControl">
+			<view class="lease-float-left">
+				<u-icon name="play-right-fill" color="#306afc" size="18"></u-icon>
+				<view class="lease-float-info">
+					<text class="lease-float-title">{{ deviceStore.deviceName || '外骨骼设备' }}</text>
+					<text class="lease-float-sub">使用中 · {{ leaseDuration }}</text>
 				</view>
 			</view>
-			<!-- 未连接：扫码租赁 -->
-			<view v-else class="scan-main-btn" @click="onScan">
-				<view class="scan-inner">
-					<image class="scan-icon" src="/static/scan-icon.png" mode="aspectFit"></image>
-					<text class="scan-text">扫码租赁</text>
+			<view class="lease-float-right">
+				<text class="lease-float-cost">¥{{ leaseCostDisplay }}</text>
+				<view class="lease-float-btn">
+					<text>继续</text>
+					<u-icon name="arrow-right" color="#fff" size="12"></u-icon>
 				</view>
-			</view>
-			<view class="tab-item" @click="goToProfile">
-				<image class="tab-img" src="/static/icon-person.png" mode="aspectFit"></image>
-				<text class="tab-label">个人中心</text>
 			</view>
 		</view>
 
-		<!-- 柜机详情面板 -->
-		<view v-if="showDetailPanel" class="detail-panel-overlay" @click="closeDetailPanel">
-			<view class="detail-panel" @click.stop>
-				<view class="dp-header">
-					<text class="dp-title">{{ selectedCabinet?.cabinetName || selectedCabinet?.name || '柜机详情' }}</text>
-					<text class="dp-close" @click="closeDetailPanel">✕</text>
+		<!-- 待支付订单悬浮卡片 -->
+		<view v-if="pendingOrder" class="pending-float-card" @click="goToPendingOrder">
+			<view class="lease-float-left">
+				<u-icon name="clock-fill" color="#f59e0b" size="18"></u-icon>
+				<view class="lease-float-info">
+					<text class="lease-float-title">{{ pendingOrder.deviceName || '外骨骼设备' }}</text>
+					<text class="lease-float-sub">已归还 · 待支付</text>
 				</view>
-				<view class="dp-info">
-					<text class="dp-no">编号：{{ selectedCabinet?.cabinetNo || '-' }}</text>
-					<text class="dp-address">地址：{{ selectedCabinet?.address || '-' }}</text>
-					<view class="dp-stats">
-						<text class="dp-stat">总设备：{{ selectedCabinet?.totalDevices || selectedCabinet?.totalDeviceCount || 0 }}</text>
-						<text class="dp-stat dp-available">可租：{{ selectedCabinet?.availableDevices || selectedCabinet?.availableDeviceCount || 0 }}</text>
-					</view>
-				</view>
-				<!-- 收费信息 -->
-				<view class="dp-fee">
-					<view class="dp-fee-item">
-						<text class="dp-fee-label">租金</text>
-						<text class="dp-fee-num">{{ dpFeeRate }}</text>
-						<text class="dp-fee-unit">元/分钟</text>
-					</view>
-					<view class="dp-fee-divider"></view>
-					<view class="dp-fee-item">
-						<text class="dp-fee-label">押金</text>
-						<text class="dp-fee-num">{{ dpFeeDeposit }}</text>
-						<text class="dp-fee-unit">元</text>
-					</view>
-					<view class="dp-fee-divider"></view>
-					<view class="dp-fee-item">
-						<text class="dp-fee-label">免费时长</text>
-						<text class="dp-fee-num">{{ dpFeeFreeMinutes }}</text>
-						<text class="dp-fee-unit">分钟</text>
-					</view>
-				</view>
-				<!-- 导航按钮 -->
-				<view class="dp-nav-btn" @click="goToCabinetDetail">
-					<text class="dp-nav-text">查看详情 / 导航</text>
+			</view>
+			<view class="lease-float-right">
+				<text class="lease-float-cost">¥{{ ((pendingOrder.payMoney || 0) / 100).toFixed(2) }}</text>
+				<view class="pending-float-btn">
+					<text>去支付</text>
+					<u-icon name="arrow-right" color="#fff" size="12"></u-icon>
 				</view>
 			</view>
 		</view>
+
+		<!-- 底部抽屉：附近机柜列表 -->
+		<BottomDrawer :min-height="240" :max-height="520" :expanded="drawerExpanded" @change="onDrawerChange">
+			<view class="drawer-header">
+				<view class="drawer-title-wrap">
+					<text class="drawer-title">附近租借点</text>
+					<text class="drawer-subtitle">为你推荐附近的可租借点</text>
+				</view>
+				<!-- <view class="list-mode-btn" @tap="goToCabinetList">
+					<text>列表模式</text>
+					<u-icon name="list-dot" color="#306afc" size="16"></u-icon>
+				</view> -->
+			</view>
+
+			<scroll-view class="cabinet-scroll" scroll-y enhanced :show-scrollbar="false">
+				<view
+					v-for="item in cabinetList"
+					:key="item.id"
+					class="cabinet-card"
+					@tap="goToCabinetDetail(item)"
+				>
+					<!-- 左侧图片 -->
+					<image
+						class="cabinet-img"
+						:src="item.imageUrl || item.image || '/static/wz_logo.png'"
+						mode="aspectFill"
+					></image>
+
+					<!-- 中间信息 -->
+					<view class="cabinet-info">
+						<text class="cabinet-name">{{ item.cabinetName || item.name || '柜机' }}</text>
+						<view class="cabinet-meta-row">
+							<u-icon name="map" color="#999" size="12"></u-icon>
+							<text class="cabinet-distance">约 {{ item.distanceText }}</text>
+							<view class="cabinet-status-tag" :class="item.status === 'online' || item.status === 'OPEN' || item.status === 1 ? 'status-open' : 'status-close'">
+								<text>{{ item.status === 'online' || item.status === 'OPEN' || item.status === 1 ? '营业中' : '休息中' }}</text>
+							</view>
+							<text v-if="item.businessHours" class="cabinet-hours">{{ item.businessHours }}</text>
+						</view>
+						<view class="cabinet-meta-row">
+							<u-icon name="map-fill" color="#ccc" size="12"></u-icon>
+							<text class="cabinet-address">{{ item.address || item.location || '暂无地址信息' }}</text>
+						</view>
+						<view class="cabinet-price-row">
+						<text class="cabinet-price">
+							¥{{ (item.feeTemplate?.hourlyRate ? (item.feeTemplate.hourlyRate / 100).toFixed(2) : item.rate || item.hourlyRate || '1.50') }}/小时
+						</text>
+						<text v-if="item.feeTemplate?.dailyCap || item.dailyCap || item.cap" class="cabinet-cap">
+							· 24小时封顶¥{{ item.feeTemplate?.dailyCap ? (item.feeTemplate.dailyCap / 100).toFixed(2) : item.dailyCap || item.cap || '30.00' }}
+						</text>
+					</view>
+					</view>
+
+					<!-- 右侧数量 + 导航 -->
+					<view class="cabinet-right">
+						<view class="cabinet-count">
+							<text class="cabinet-count-num">{{ item.availableDevices || item.availableDeviceCount || 0 }}</text>
+							<text class="cabinet-count-label">可借</text>
+						</view>
+						<view class="nav-btn" @tap.stop="openNavigation(item)">
+							<image src="/static/navigation.png" mode="aspectFit"></image>
+						</view>
+					</view>
+				</view>
+
+				<!-- 空状态 -->
+				<view v-if="cabinetList.length === 0" class="empty-state">
+					<u-icon name="map" color="#ccc" size="40"></u-icon>
+					<text class="empty-text">附近暂无可用机柜</text>
+				</view>
+			</scroll-view>
+		</BottomDrawer>
 	</view>
 </template>
 
@@ -103,8 +142,13 @@
 	import {
 		ref,
 		computed,
-		onMounted
+		onMounted,
+		onUnmounted
 	} from 'vue';
+	import {
+		onShow,
+		onHide
+	} from '@dcloudio/uni-app';
 	import {
 		useDeviceStore
 	} from '../../store/device.js';
@@ -112,23 +156,44 @@
 		api
 	} from '../../services/api.js';
 	import {
+		reportLocation,
+		resetLocationDedup
+	} from '../../services/location.js';
+	import {
 		parseDeviceQr
 	} from '../../utils/qr-parser.js';
 	import { logout } from '../../services/auth.js';
+	import BottomDrawer from '../../components/BottomDrawer.vue';
 
 	const deviceStore = useDeviceStore();
 
 	const statusBarHeight = ref(20)
 	const locating = ref(false)
 	let mapContext = null
+	const pendingOrder = ref(null)
 
 	// 标志：跳过由程序触发的 regionchange（如 moveToLocation 后），只响应用户手势
-	let skipNextRegionChange = false
-	const mapScale = ref(18)
+	let skipRegionCount = 0 // 允许跳过多次程序触发的 regionchange（如 moveToLocation 后），只响应用户手势
+	let fetchNearbyTimer = null // 防抖定时器
+	const SEARCH_RADIUS = 2000 // 搜索半径（米）
+	const mapScale = ref(14) // 默认缩放，主动定位时根据半径调整，拖动时不改变
 	const mapCenter = ref({
 		lat: 39.9042,
 		lng: 116.4074
 	}) // 默认北京
+
+	// 根据搜索半径计算合适的地图缩放等级
+	function calcScaleByRadius(radiusMeters) {
+		if (radiusMeters <= 100) return 18;
+		if (radiusMeters <= 300) return 17;
+		if (radiusMeters <= 500) return 16;
+		if (radiusMeters <= 1000) return 15;
+		if (radiusMeters <= 2000) return 14;
+		if (radiusMeters <= 5000) return 12;
+		if (radiusMeters <= 10000) return 11;
+		if (radiusMeters <= 20000) return 10;
+		return 9;
+	}
 
 	// 用户位置（查询中心点）
 	const myLocation = ref({
@@ -139,12 +204,102 @@
 
 	// 附近柜机列表（真实接口）
 	const cabinets = ref([]);
+	const drawerExpanded = ref(false);
 
-	// 柜机详情面板
-	const showDetailPanel = ref(false);
-	const selectedCabinet = ref(null);
+
 
 	const totalAvailable = computed(() => cabinets.value.reduce((sum, c) => sum + (c.availableDevices || c.availableDeviceCount || 0), 0));
+
+	// 租赁中时长与费用（实时计算）
+	const leaseDuration = ref('00:00');
+	const leaseCostDisplay = ref('0.00');
+	let leaseTimer = null;
+
+	function updateLeaseFloat() {
+		if (!deviceStore.leaseRunning || !deviceStore.leaseStartTime) return;
+		const elapsed = Math.floor((Date.now() - deviceStore.leaseStartTime) / 1000);
+		const h = Math.floor(elapsed / 3600);
+		const m = Math.floor((elapsed % 3600) / 60);
+		const s = elapsed % 60;
+		leaseDuration.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+		// 费用计算：与 demo-control 保持一致（不足1小时按1小时计）
+		const minutes = Math.floor(elapsed / 60);
+		const billableMinutes = Math.max(0, minutes - (deviceStore.leaseFreeMinutes || 0));
+		let cost = 0;
+		if (billableMinutes > 0) {
+			const billableHours = Math.ceil(billableMinutes / 60);
+			cost = (billableHours * (deviceStore.leaseRate || 0)) / 100;
+		}
+		leaseCostDisplay.value = cost.toFixed(2);
+	}
+
+	// 带距离和补充字段的柜机列表
+	const cabinetList = computed(() => {
+		const list = cabinets.value.map(c => {
+			const lat = c.latitude ?? c.lat ?? 0;
+			const lng = c.longitude ?? c.lng ?? 0;
+			const userLat = myLocation.value.lat;
+			const userLng = myLocation.value.lng;
+			const d = haversine(userLat, userLng, lat, lng);
+			const distanceText = d >= 1000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm';
+			return {
+				...c,
+				id: c.id ?? c.cabinetNo,
+				lat,
+				lng,
+				distance: d,
+				distanceText,
+			};
+		});
+		// 按距离排序
+		list.sort((a, b) => a.distance - b.distance);
+		return list;
+	});
+
+	function haversine(lat1, lng1, lat2, lng2) {
+		const R = 6371000;
+		const dLat = (lat2 - lat1) * Math.PI / 180;
+		const dLng = (lng2 - lng1) * Math.PI / 180;
+		const a = Math.sin(dLat / 2) ** 2 +
+			Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+		return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+	}
+
+	function onDrawerChange(expanded) {
+		drawerExpanded.value = expanded;
+	}
+
+	function goToCabinetDetail(item) {
+		const id = item.id;
+		const lat = item.latitude || item.lat || 0;
+		const lng = item.longitude || item.lng || 0;
+		const userLat = myLocation.value.lat;
+		const userLng = myLocation.value.lng;
+		uni.navigateTo({
+			url: `/pages/cabinet/detail?id=${id}&lat=${lat}&lng=${lng}&userLat=${userLat}&userLng=${userLng}`,
+		});
+	}
+
+	function goToCabinetList() {
+		uni.navigateTo({
+			url: '/pages/cabinet/list'
+		});
+	}
+
+	function openNavigation(item) {
+		const lat = item.latitude || item.lat || 0;
+		const lng = item.longitude || item.lng || 0;
+		const name = item.cabinetName || item.name || '机柜位置';
+		uni.openLocation({
+			latitude: lat,
+			longitude: lng,
+			name,
+			address: item.address || '',
+			fail: () => {
+				uni.showToast({ title: '无法打开导航', icon: 'none' });
+			}
+		});
+	}
 
 	// 地图 markers（柜机点）
 	const mapMarkers = computed(() => {
@@ -159,15 +314,15 @@
 				latitude: lat,
 				longitude: lng,
 				iconPath: '/static/marker-device.png',
-				width: 32,
-				height: 40,
+				width: 30,
+				height: 30,
 				callout: {
 					content: `可租 ${available} 台`,
 					color: '#fff',
 					fontSize: 12,
 					borderRadius: 8,
-					borderColor:'#9268f7',
-					bgColor: '#9268f7',
+					borderColor:'#306afc',
+					bgColor: '#306afc',
 					padding: 6,
 					display: 'ALWAYS',
 					textAlign: 'center',
@@ -177,11 +332,91 @@
 		return markers;
 	});
 
+	// 定位上报定时器
+	let locationTimer = null;
+
+	async function checkActiveLease() {
+		try {
+			const res = await api.getMyOrders({ status: 1, pageNum: 1, pageSize: 1 });
+			if ((res.code === 200 || res.code === 0) && res.data) {
+				const records = res.data.records || res.data.list || res.data || [];
+				if (records.length > 0) {
+					const order = records[0];
+					const startTime = order.pickupTime ? new Date(order.pickupTime).getTime() : Date.now();
+					deviceStore.setLeaseInfo({
+						tradeNo: order.tradeNo || '',
+						deviceSn: order.deviceSn || '',
+						startTime,
+						rate: order.hourlyRate || 0,
+						freeMinutes: order.freeMinutes || 0,
+						deposit: order.depositMoney || 0,
+						deviceName: order.deviceName || '外骨骼设备',
+					});
+					console.log('[Index] 恢复进行中的订单:', order.tradeNo);
+					return true;
+				}
+			}
+		} catch (e) {
+			console.warn('[Index] 查询进行中的订单失败:', e.message);
+		}
+		// API 无数据时回退到本地 storage
+		deviceStore.restoreLeaseInfo();
+		return deviceStore.leaseRunning;
+	}
+
+	async function checkPendingPayment() {
+		try {
+			const res = await api.getMyOrders({ status: 2, pageNum: 1, pageSize: 1 });
+			if ((res.code === 200 || res.code === 0) && res.data) {
+				const records = res.data.records || res.data.list || res.data || [];
+				if (records.length > 0) {
+					pendingOrder.value = records[0];
+					console.log('[Index] 发现待支付订单:', pendingOrder.value.tradeNo);
+					return true;
+				}
+			}
+		} catch (e) {
+			console.warn('[Index] 查询待支付订单失败:', e.message);
+		}
+		pendingOrder.value = null;
+		return false;
+	}
+
+	async function startLeaseServices() {
+		// 启动悬浮卡片定时刷新
+		if (!leaseTimer) {
+			updateLeaseFloat();
+			leaseTimer = setInterval(updateLeaseFloat, 1000);
+		}
+		// 启动定位上报（每 5 秒一次，内部自动去重）
+		if (!locationTimer && deviceStore.leaseDeviceSn) {
+			locationTimer = setInterval(() => {
+				reportLocation(deviceStore.leaseDeviceSn);
+			}, 5000);
+		}
+	}
+
+	function stopLeaseServices() {
+		if (leaseTimer) {
+			clearInterval(leaseTimer);
+			leaseTimer = null;
+		}
+		if (locationTimer) {
+			clearInterval(locationTimer);
+			locationTimer = null;
+		}
+	}
+
 	onMounted(async () => {
 		const sys = await uni.getSystemInfo()
 		statusBarHeight.value = sys.statusBarHeight || 20
-		// 恢复租赁状态（防止返回首页丢失）
-		deviceStore.restoreLeaseInfo();
+		// 查询进行中的订单，恢复租赁状态
+		const hasActiveLease = await checkActiveLease();
+		if (hasActiveLease) {
+			await startLeaseServices();
+		}
+		// 查询待支付订单
+		await checkPendingPayment();
 		// 延迟创建 mapContext 并定位，确保 map 完全渲染
 		setTimeout(() => {
 			mapContext = uni.createMapContext('mapEl', null);
@@ -195,25 +430,78 @@
 		}
 	});
 
-	// 地图区域变化：只在拖动结束时获取中心点并查询柜机
+	let isFirstShow = true;
+
+	onShow(async () => {
+		// 首次 onShow 与 onMounted 同时触发，跳过避免重复请求
+		if (isFirstShow) {
+			isFirstShow = false;
+			// 仅检查租赁状态
+			if (!deviceStore.leaseRunning) {
+				const hasActiveLease = await checkActiveLease();
+				if (hasActiveLease) await startLeaseServices();
+			} else if (!leaseTimer) {
+				await startLeaseServices();
+			}
+			// 检查待支付订单
+			await checkPendingPayment();
+			return;
+		}
+		// 非首次显示：刷新柜机列表
+		if (myLocation.value && myLocation.value.lat) {
+			fetchNearbyCabinets(myLocation.value.lng, myLocation.value.lat);
+		} else {
+			getLocation();
+		}
+		// 检查租赁状态（处理从其他页面返回）
+		if (!deviceStore.leaseRunning) {
+			const hasActiveLease = await checkActiveLease();
+			if (hasActiveLease) {
+				await startLeaseServices();
+			}
+		} else if (!leaseTimer) {
+			await startLeaseServices();
+		}
+		// 检查待支付订单（处理从结算页返回）
+		await checkPendingPayment();
+	});
+
+	onHide(() => {
+		// 页面隐藏时停止定位上报（节省电量），但保持计时器
+		if (locationTimer) {
+			clearInterval(locationTimer);
+			locationTimer = null;
+		}
+	});
+
+	onUnmounted(() => {
+		stopLeaseServices();
+	});
+
+	// 地图区域变化：只在拖动结束时获取中心点并查询柜机（带防抖）
+	// 注意：拖动时不修改 mapCenter，避免地图跳动；只更新查询中心并拉取数据
 	function onRegionChange(e) {
-		if (skipNextRegionChange) {
-			skipNextRegionChange = false;
+		if (skipRegionCount > 0) {
+			skipRegionCount--;
 			return;
 		}
 		const type = e.type || (e.detail && e.detail.type) || '';
 		if (type === 'end') {
-			if (mapContext) {
-				mapContext.getCenterLocation({
-					success: (res) => {
-						const lat = res.latitude;
-						const lng = res.longitude;
-						myLocation.value = { lat, lng };
-						mapCenter.value = { lat, lng };
-						fetchNearbyCabinets(lng, lat);
-					},
-				});
-			}
+			// 防抖：300ms 内多次 end 只取最后一次
+			if (fetchNearbyTimer) clearTimeout(fetchNearbyTimer);
+			fetchNearbyTimer = setTimeout(() => {
+				if (mapContext) {
+					mapContext.getCenterLocation({
+						success: (res) => {
+							const lat = res.latitude;
+							const lng = res.longitude;
+							myLocation.value = { lat, lng };
+							// 拖动后不修改 mapCenter，让定位钉保持在屏幕中央
+							fetchNearbyCabinets(lng, lat);
+						},
+					});
+				}
+			}, 300);
 		}
 	}
 
@@ -264,12 +552,12 @@
 				const lng = res.longitude;
 				myLocation.value = { lat, lng };
 				mapCenter.value = { lat, lng };
-				mapScale.value = 18;
+				mapScale.value = calcScaleByRadius(SEARCH_RADIUS);
 				locating.value = false;
 				reverseGeocode(lat, lng);
 				// 移动地图到当前位置（mapContext 已确保创建）
 				if (mapContext) {
-					skipNextRegionChange = true;
+					skipRegionCount += 2;
 					mapContext.moveToLocation({ latitude: lat, longitude: lng });
 				}
 				await fetchNearbyCabinets(lng, lat);
@@ -284,7 +572,7 @@
 	function handleLocationFail() {
 		locationText.value = '北京市 · 朝阳区';
 		mapCenter.value = { lat: 39.9042, lng: 116.4074 };
-		mapScale.value = 18;
+		mapScale.value = calcScaleByRadius(SEARCH_RADIUS);
 		locating.value = false;
 		uni.showToast({
 			title: '使用默认位置（北京）',
@@ -325,10 +613,25 @@
 		});
 	}
 
-	// 获取附近柜机
+	// 获取附近柜机（带请求级防抖，1秒内只发一次真实请求）
+	let lastFetchTime = 0;
+	let lastFetchLng = 0;
+	let lastFetchLat = 0;
+
 	async function fetchNearbyCabinets(lng, lat) {
+		const now = Date.now();
+		// 距离上次请求不足 1 秒，且坐标接近（<0.0001° ≈ 10m），跳过
+		if (now - lastFetchTime < 1000 &&
+			Math.abs(lng - lastFetchLng) < 0.0001 &&
+			Math.abs(lat - lastFetchLat) < 0.0001) {
+			console.log('[Index] 跳过重复 nearby 请求');
+			return;
+		}
+		lastFetchTime = now;
+		lastFetchLng = lng;
+		lastFetchLat = lat;
 		try {
-			const result = await api.getNearbyCabinets({ lng, lat, radius: 5000 });
+			const result = await api.getNearbyCabinets({ lng, lat, radius: SEARCH_RADIUS });
 			if (result.code === 0 || result.code === 200) {
 				cabinets.value = result.data || [];
 			} else {
@@ -352,10 +655,10 @@
 				locating.value = false;
 				myLocation.value = { lat, lng };
 				mapCenter.value = { lat, lng };
-				mapScale.value = 18; // 重置缩放比例
+				mapScale.value = calcScaleByRadius(SEARCH_RADIUS); // 重置缩放比例
 				// 移动地图到当前位置
 				if (mapContext) {
-					skipNextRegionChange = true;
+					skipRegionCount += 2;
 					mapContext.moveToLocation({ latitude: lat, longitude: lng });
 				}
 				fetchNearbyCabinets(lng, lat);
@@ -368,100 +671,19 @@
 	}
 
 	function onMarkerTap(e) {
-		const id = e.detail?.markerId || e.markerId;
-		if (!id || id === 0) return;
-		const cabinet = cabinets.value.find(c => (c.id ?? c.cabinetNo) === id);
-		if (cabinet) openCabinetDetail(cabinet);
-	}
-
-	function formatDistance(d) {
-		return d >= 1000 ? (d / 1000).toFixed(1) + 'km' : d + 'm';
-	}
-
-	// ── 柜机详情面板 ──
-	function openCabinetDetail(cabinet) {
-		selectedCabinet.value = cabinet;
-		showDetailPanel.value = true;
-	}
-
-	function closeDetailPanel() {
-		showDetailPanel.value = false;
-		selectedCabinet.value = null;
-	}
-
-	const dpFeeRate = computed(() => {
-		const rate = selectedCabinet.value?.rate || 0;
-		return rate > 0 ? (rate / 100).toFixed(2) : '1.00';
-	});
-	const dpFeeDeposit = computed(() => {
-		const deposit = selectedCabinet.value?.deposit || 0;
-		return deposit > 0 ? (deposit / 100).toFixed(2) : '0.00';
-	});
-	const dpFeeFreeMinutes = computed(() => {
-		return selectedCabinet.value?.freeMinutes || 0;
-	});
-
-	function goToCabinetDetail() {
-		const c = selectedCabinet.value;
-		if (!c) return;
-		closeDetailPanel();
-		const no = c.cabinetNo || c.id;
-		const lat = c.latitude || c.lat || 0;
-		const lng = c.longitude || c.lng || 0;
+		const markerId = e.detail?.markerId || e.markerId;
+		if (!markerId || markerId === 0) return;
+		const cabinet = cabinets.value.find(c => (c.id ?? c.cabinetNo) === markerId);
+		if (!cabinet) return;
+		const id = cabinet.id ?? cabinet.cabinetNo;
+		const lat = cabinet.latitude || cabinet.lat || 0;
+		const lng = cabinet.longitude || cabinet.lng || 0;
 		const userLat = myLocation.value.lat;
 		const userLng = myLocation.value.lng;
 		uni.navigateTo({
-			url: `/pages/cabinet/detail?cabinetNo=${no}&lat=${lat}&lng=${lng}&userLat=${userLat}&userLng=${userLng}`,
+			url: `/pages/cabinet/detail?id=${id}&lat=${lat}&lng=${lng}&userLat=${userLat}&userLng=${userLng}`,
 		});
 	}
-
-	// ── 扫码：支持设备二维码自动连接 & 纯SN租赁 ──
-	async function onScan() {
-		uni.scanCode({
-			onlyFromCamera: true,
-			success: async (res) => {
-				const qr = parseDeviceQr(res.result);
-				if (qr.sn && qr.mac) {
-					// 真实流程：scan → confirm → demo-control
-					uni.showLoading({ title: '获取设备信息...', mask: true });
-					try {
-						const scanRes = await api.scanDevice(qr.sn);
-						if ((scanRes.code === 200 || scanRes.code === 0) && scanRes.data) {
-							const d = scanRes.data;
-							// 确认租借
-							const confirmRes = await api.confirmLease({ deviceSn: d.deviceSn });
-							if (confirmRes.code === 200 || confirmRes.code === 0) {
-								uni.navigateTo({
-									url: `/pages/device/demo-control?tradeNo=${d.tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(qr.name || '外骨骼设备')}&hourlyRate=${d.hourlyRate || 0}&freeMinutes=${d.freeMinutes || 0}&depositMoney=${d.depositMoney || 0}`
-								});
-							} else {
-								uni.showToast({ title: confirmRes.msg || '租借确认失败', icon: 'none' });
-							}
-						} else {
-							uni.showToast({ title: scanRes.msg || '设备信息获取失败', icon: 'none' });
-						}
-					} catch (e) {
-						uni.showToast({ title: e.message || '请求失败', icon: 'none' });
-					} finally {
-						uni.hideLoading();
-					}
-				} else if (qr.sn) {
-					// 纯 SN：走租赁确认流程
-					uni.navigateTo({
-						url: `/pages/lease/confirm?sn=${encodeURIComponent(qr.sn)}`
-					});
-				} else {
-					uni.showToast({ title: '无效二维码', icon: 'none' });
-				}
-			},
-			fail: (err) => {
-				if (err.errMsg.includes('cancel')) return;
-				uni.showToast({ title: '请扫描设备二维码', icon: 'none', duration: 2000 });
-			},
-		});
-	}
-
-
 
 	function goToScanning() {
 		uni.navigateTo({
@@ -469,29 +691,23 @@
 		})
 	}
 
-	function goToNearby() {
-		const lat = myLocation.value.lat;
-		const lng = myLocation.value.lng;
+	function goToLeaseControl() {
+		if (!deviceStore.leaseRunning) return;
+		const sn = deviceStore.leaseDeviceSn || '';
+		const rate = deviceStore.leaseRate || 0;
+		const freeMin = deviceStore.leaseFreeMinutes || 0;
+		const deposit = deviceStore.leaseDeposit || 0;
+		const name = encodeURIComponent(deviceStore.deviceName || '外骨骼设备');
 		uni.navigateTo({
-			url: `/pages/cabinet/list?lat=${lat}&lng=${lng}`
-		})
+			url: `/pages/device/demo-control?tradeNo=${deviceStore.tradeNo}&deviceSn=${sn}&name=${name}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}`
+		});
 	}
 
-	function goToProfile() {
+	function goToPendingOrder() {
+		if (!pendingOrder.value?.tradeNo) return;
 		uni.navigateTo({
-			url: '/pages/profile/my'
-		})
-	}
-
-	function goToControl() {
-		if (deviceStore.connected) {
-			uni.navigateTo({ url: '/pages/device/control' });
-		} else if (deviceStore.leaseRunning) {
-			const sn = deviceStore.leaseDeviceSn || '';
-			uni.navigateTo({
-				url: `/pages/device/demo-control?tradeNo=${deviceStore.tradeNo}&deviceSn=${sn}&name=${encodeURIComponent(deviceStore.deviceName || '外骨骼设备')}&hourlyRate=${deviceStore.leaseRate}&freeMinutes=${deviceStore.leaseFreeMinutes}&depositMoney=${deviceStore.leaseDeposit}`
-			});
-		}
+			url: `/pages/device/completed?tradeNo=${pendingOrder.value.tradeNo}`,
+		});
 	}
 
 	// ── 首页静默登录 ──
@@ -507,9 +723,12 @@
 					uni.setStorageSync('refreshToken', result.data.refreshToken)
 				}
 				if (result.data.memberId) {
-					uni.setStorageSync('memberId', String(result.data.memberId))
-				}
-				console.log('[Index] 静默登录成功')
+				uni.setStorageSync('memberId', String(result.data.memberId))
+			}
+			if (result.data.openId) {
+				uni.setStorageSync('openId', result.data.openId)
+			}
+			console.log('[Index] 静默登录成功')
 			}
 		} catch (err) {
 			console.error('[Index] 静默登录失败:', err.message || err)
@@ -665,230 +884,316 @@
 		height: 24px;
 	}
 
-	.custom-tabbar {
-		flex-shrink: 0;
-		height: 80px;
-		padding: 10px 0;
+	/* ===== 底部抽屉内容样式 ===== */
+	.drawer-header {
 		display: flex;
 		align-items: center;
-		justify-content: space-around;
-		padding-bottom: calc(16px + env(safe-area-inset-bottom));
-	}
-
-	.tab-item {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		padding: 8px 16px;
-		@include tap-active;
-	}
-
-	.tab-img {
-		width: 26px;
-		height: 26px;
-	}
-
-	.tab-label {
-		@include text-caption;
-		margin-top: 4px;
-		color: #000;
-	}
-
-
-	.scan-main-btn {
-		width: 50%;
-		height: 66px;
-		background: linear-gradient(135deg, $primaryColor, $primaryLight);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 40px;
-		box-shadow: 0 -4px 20px rgba(139, 92, 246, 0.35);
-		@include tap-active;
-	}
-
-	.scan-inner {
-		display: flex;
-		gap: 5px;
-		align-items: center;
-	}
-
-	.scan-icon {
-		width: 26px;
-		height: 26px;
-	}
-
-	.scan-text {
-		font-size: 18px;
-		color: #000;
-		font-weight: 800;
-	}
-
-	/* 已连接状态：复用 scan-main-btn 尺寸，统一布局 */
-	.exo-icon {
-		width: 30px;
-		height: 30px;
-		border-radius: 6px;
-		flex-shrink: 0;
-	}
-
-	.connected-info {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		min-width: 0;
-	}
-
-	.connected-name {
-		font-size: 15px;
-		font-weight: 800;
-		color: #fff;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.connected-hint {
-		font-size: 11px;
-		color: rgba(255, 255, 255, 0.8);
-	}
-
-	/* ── 柜机详情面板 ── */
-	.detail-panel-overlay {
-		position: fixed;
-		inset: 0;
-		z-index: 100;
-		background: rgba(0, 0, 0, 0.35);
-		display: flex;
-		flex-direction: column;
-		justify-content: flex-end;
-	}
-
-	.detail-panel {
-		background: #fff;
-		border-radius: 24px 24px 0 0;
-		padding: 20px 18px;
-		padding-bottom: calc(20px + env(safe-area-inset-bottom));
-		max-height: 70vh;
-		display: flex;
-		flex-direction: column;
-		animation: dp-slide-up 0.25s ease-out;
-	}
-
-	@keyframes dp-slide-up {
-		from {
-			transform: translateY(100%);
-		}
-		to {
-			transform: translateY(0);
-		}
-	}
-
-	.dp-header {
-		@include flex-between;
+		justify-content: space-between;
 		margin-bottom: 12px;
+		padding: 0 4px;
 	}
 
-	.dp-title {
-		font-size: 17px;
+	.drawer-title-wrap {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+	}
+
+	.drawer-title {
+		font-size: 16px;
 		font-weight: 800;
 		color: $textMainColor;
 	}
 
-	.dp-close {
-		font-size: 18px;
-		color: #999;
+	.drawer-subtitle {
+		font-size: 12px;
+		color: $textSubColor;
+	}
+
+	.list-mode-btn {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 12px;
+		color: $primaryColor;
+		font-weight: 600;
 		padding: 4px 8px;
+		border-radius: 8px;
+		background: rgba(48, 106, 252, 0.08);
+	}
+
+	.cabinet-scroll {
+		height: 100%;
+	}
+
+	/* 机柜卡片 */
+	.cabinet-card {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px;
+		background: #fff;
+		border-radius: 16px;
+		margin-bottom: 10px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+		border: 1px solid rgba(0, 0, 0, 0.04);
+		transition: transform 0.15s;
+	}
+
+	.cabinet-card:active {
+		transform: scale(0.985);
+		background: #fafafa;
+	}
+
+	.cabinet-img {
+		width: 72px;
+		height: 72px;
+		border-radius: 12px;
+		background: #f5f6fa;
+		flex-shrink: 0;
+		object-fit: cover;
+	}
+
+	.cabinet-info {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+
+	.cabinet-name {
+		font-size: 15px;
+		font-weight: 800;
+		color: $textMainColor;
+		@include text-ellipsis;
+	}
+
+	.cabinet-meta-row {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		overflow: hidden;
+	}
+
+	.cabinet-distance {
+		font-size: 11px;
+		color: #666;
+		flex-shrink: 0;
+	}
+
+	.cabinet-status-tag {
+		font-size: 10px;
+		padding: 2px 8px;
+		border-radius: 10px;
+		font-weight: 700;
+		flex-shrink: 0;
+	}
+
+	.cabinet-status-tag.status-open {
+		background: rgba(40, 199, 111, 0.12);
+		color: #28c76f;
+	}
+
+	.cabinet-status-tag.status-close {
+		background: rgba(153, 153, 153, 0.1);
+		color: #999;
+	}
+
+	.cabinet-hours {
+		font-size: 10px;
+		color: #999;
+		flex-shrink: 0;
+	}
+
+	.cabinet-address {
+		font-size: 11px;
+		color: #999;
+		@include text-ellipsis;
+		flex: 1;
+	}
+
+	.cabinet-price-row {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.cabinet-price {
+		font-size: 14px;
+		font-weight: 800;
+		color: $dangerColor;
+	}
+
+	.cabinet-cap {
+		font-size: 11px;
+		color: #999;
+	}
+
+	/* 右侧 */
+	.cabinet-right {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+		min-width: 48px;
+	}
+
+	.cabinet-count {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+	}
+
+	.cabinet-count-num {
+		font-size: 22px;
+		font-weight: 900;
+		color: $textMainColor;
 		line-height: 1;
 	}
 
-	.dp-info {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		margin-bottom: 14px;
-		padding-bottom: 14px;
-		border-bottom: 1px solid #f0f0f0;
+	.cabinet-count-label {
+		font-size: 10px;
+		color: $textSubColor;
+		margin-top: 2px;
 	}
 
-	.dp-no {
-		font-size: 13px;
-		color: #666;
-	}
-
-	.dp-address {
-		font-size: 13px;
-		color: #666;
-	}
-
-	.dp-stats {
-		display: flex;
-		gap: 16px;
-		margin-top: 4px;
-	}
-
-	.dp-stat {
-		font-size: 13px;
-		color: #666;
-	}
-
-	.dp-available {
-		color: $primaryColor;
-		font-weight: 700;
-	}
-
-	/* 收费信息 */
-	.dp-fee {
+	.nav-btn {
+		width: 32px;
+		height: 32px;
 		display: flex;
 		align-items: center;
-		justify-content: space-around;
-		padding: 16px 0;
-		margin-top: 8px;
-		border-top: 1px solid #f0f0f0;
+		justify-content: center;
 	}
 
-	.dp-fee-item {
+	.nav-btn:active {
+		opacity: 0.8;
+	}
+
+	/* 空状态 */
+	.empty-state {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 4px;
+		padding: 40px 20px;
+		gap: 8px;
 	}
 
-	.dp-fee-label {
-		font-size: 12px;
+	.empty-text {
+		font-size: 13px;
 		color: #999;
 	}
 
-	.dp-fee-num {
-		font-size: 20px;
-		font-weight: 800;
-		color: $primaryColor;
+	/* 租赁中悬浮卡片 */
+	.lease-float-card {
+		position: fixed;
+		bottom: 260px;
+		left: 16px;
+		right: 16px;
+		z-index: 100;
+		background: #fff;
+		border-radius: 16px;
+		padding: 14px 16px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		box-shadow: 0 4px 20px rgba(48, 106, 252, 0.18);
+		border: 1.5px solid rgba(48, 106, 252, 0.12);
+		transition: transform 0.15s;
 	}
 
-	.dp-fee-unit {
-		font-size: 11px;
-		color: #666;
+	.lease-float-card:active {
+		transform: scale(0.98);
 	}
 
-	.dp-fee-divider {
-		width: 1px;
-		height: 32px;
-		background: #f0f0f0;
+	.lease-float-left {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 	}
 
-	/* 导航按钮 */
-	.dp-nav-btn {
-		margin-top: 12px;
-		padding: 14px;
-		background: linear-gradient(135deg, $primaryColor, $primaryLight);
-		border-radius: 12px;
-		text-align: center;
-		@include tap-active;
+	.lease-float-info {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
 	}
 
-	.dp-nav-text {
+	.lease-float-title {
 		font-size: 15px;
-		font-weight: 700;
-		color: #fff;
+		font-weight: 800;
+		color: $textMainColor;
 	}
+
+	.lease-float-sub {
+		font-size: 12px;
+		color: $textSubColor;
+	}
+
+	.lease-float-right {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.lease-float-cost {
+		font-size: 16px;
+		font-weight: 800;
+		color: $dangerColor;
+	}
+
+	.lease-float-btn {
+		background: $primaryColor;
+		color: #fff;
+		font-size: 12px;
+		font-weight: 700;
+		padding: 6px 12px;
+		border-radius: 20px;
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+
+	.lease-float-btn:active {
+		opacity: 0.8;
+	}
+
+	/* 待支付订单悬浮卡片 */
+	.pending-float-card {
+		position: fixed;
+		bottom: 260px;
+		left: 16px;
+		right: 16px;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background: linear-gradient(135deg, #fff 0%, #fffbf0 100%);
+		border-radius: 16px;
+		padding: 14px 16px;
+		box-shadow: 0 4px 20px rgba(245, 158, 11, 0.18);
+		border: 1.5px solid rgba(245, 158, 11, 0.12);
+		transition: transform 0.15s;
+	}
+
+	.pending-float-card:active {
+		transform: scale(0.98);
+	}
+
+	.pending-float-btn {
+		background: #f59e0b;
+		color: #fff;
+		font-size: 12px;
+		font-weight: 700;
+		padding: 6px 12px;
+		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+
+	.pending-float-btn:active {
+		opacity: 0.8;
+	}
+
 </style>

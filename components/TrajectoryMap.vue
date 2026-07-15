@@ -1,10 +1,11 @@
 <template>
 	<view class="trajectory-map-wrap" :style="{ height: height }">
 		<map
+			:id="mapId"
 			class="map-el"
 			:latitude="centerLat"
 			:longitude="centerLng"
-			:scale="scale"
+			:scale="displayScale"
 			:polyline="polylines"
 			:markers="markers"
 			:show-location="showLocation"
@@ -19,7 +20,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
 	points: {
@@ -36,43 +37,67 @@ const props = defineProps({
 	}
 });
 
+const mapId = `trajectoryMap_${Math.random().toString(36).slice(2, 10)}`;
+const fitTimer = ref(null);
+const scaleTimer = ref(null);
+const displayScale = ref(18);
+
 // 轨迹点格式: [{ latitude, longitude, timestamp }]
 const validPoints = computed(() => {
-	return (props.points || []).filter(p => p && typeof p.latitude === 'number' && typeof p.longitude === 'number');
+	return (props.points || [])
+		.map(p => ({
+			...(p || {}),
+			latitude: Number(p?.latitude),
+			longitude: Number(p?.longitude),
+		}))
+		.filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
 });
 
-// 中心点：取所有点的平均值，或第一个点
+// 中心点：取轨迹范围中心，避免点分布不均时偏离轨迹线
 const centerLat = computed(() => {
 	const pts = validPoints.value;
 	if (pts.length === 0) return 39.9042;
 	if (pts.length === 1) return pts[0].latitude;
-	const sum = pts.reduce((s, p) => s + p.latitude, 0);
-	return sum / pts.length;
+	const lats = pts.map(p => p.latitude);
+	return (Math.min(...lats) + Math.max(...lats)) / 2;
 });
 
 const centerLng = computed(() => {
 	const pts = validPoints.value;
 	if (pts.length === 0) return 116.4074;
 	if (pts.length === 1) return pts[0].longitude;
-	const sum = pts.reduce((s, p) => s + p.longitude, 0);
-	return sum / pts.length;
+	const lngs = pts.map(p => p.longitude);
+	return (Math.min(...lngs) + Math.max(...lngs)) / 2;
 });
 
-// 缩放级别：根据轨迹范围自动计算
-const scale = computed(() => {
+// 缩放级别：根据轨迹线跨度逐级调整，轨迹短时放大，轨迹变长后逐步拉远
+const targetScale = computed(() => {
 	const pts = validPoints.value;
-	if (pts.length <= 1) return 16;
+	if (pts.length <= 1) return 18;
 	const lats = pts.map(p => p.latitude);
 	const lngs = pts.map(p => p.longitude);
-	const latRange = Math.max(...lats) - Math.min(...lats);
-	const lngRange = Math.max(...lngs) - Math.min(...lngs);
-	const maxRange = Math.max(latRange, lngRange);
-	if (maxRange < 0.001) return 18;
-	if (maxRange < 0.01) return 16;
-	if (maxRange < 0.05) return 14;
-	if (maxRange < 0.1) return 13;
-	if (maxRange < 0.5) return 12;
-	return 11;
+	const minLat = Math.min(...lats);
+	const maxLat = Math.max(...lats);
+	const minLng = Math.min(...lngs);
+	const maxLng = Math.max(...lngs);
+	const diagonalMeters = haversine(minLat, minLng, maxLat, maxLng) * 1000;
+	if (diagonalMeters < 30) return 18;
+	if (diagonalMeters < 80) return 17;
+	if (diagonalMeters < 200) return 16;
+	if (diagonalMeters < 500) return 15;
+	if (diagonalMeters < 1000) return 14;
+	if (diagonalMeters < 2500) return 13;
+	if (diagonalMeters < 5000) return 12;
+	if (diagonalMeters < 10000) return 11;
+	if (diagonalMeters < 20000) return 10;
+	return 9;
+});
+
+const includePoints = computed(() => {
+	return validPoints.value.map(p => ({
+		latitude: p.latitude,
+		longitude: p.longitude,
+	}));
 });
 
 // 轨迹线
@@ -81,7 +106,7 @@ const polylines = computed(() => {
 	if (pts.length < 2) return [];
 	return [{
 		points: pts.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
-		color: '#8B5CF6',
+		color: '#306afc',
 		width: 4,
 		arrowLine: false,
 		dottedLine: false
@@ -131,6 +156,64 @@ const distanceKm = computed(() => {
 	}
 	return total;
 });
+
+const pointSignature = computed(() => {
+	return includePoints.value.map(p => `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`).join('|');
+});
+
+onMounted(() => {
+	fitMapToLine();
+});
+
+onUnmounted(() => {
+	if (fitTimer.value) {
+		clearTimeout(fitTimer.value);
+		fitTimer.value = null;
+	}
+	if (scaleTimer.value) {
+		clearInterval(scaleTimer.value);
+		scaleTimer.value = null;
+	}
+});
+
+watch(pointSignature, () => {
+	fitMapToLine();
+});
+
+watch(targetScale, (nextScale) => {
+	smoothScaleTo(nextScale);
+}, { immediate: true });
+
+function fitMapToLine() {
+	if (fitTimer.value) {
+		clearTimeout(fitTimer.value);
+		fitTimer.value = null;
+	}
+	fitTimer.value = setTimeout(() => {
+		nextTick(() => {
+			const points = includePoints.value;
+			if (points.length < 2) return;
+			smoothScaleTo(targetScale.value);
+		});
+	}, 120);
+}
+
+function smoothScaleTo(nextScale) {
+	if (!Number.isFinite(nextScale)) return;
+	if (scaleTimer.value) {
+		clearInterval(scaleTimer.value);
+		scaleTimer.value = null;
+	}
+	if (displayScale.value === nextScale) return;
+	scaleTimer.value = setInterval(() => {
+		if (displayScale.value === nextScale) {
+			clearInterval(scaleTimer.value);
+			scaleTimer.value = null;
+			return;
+		}
+		displayScale.value += displayScale.value < nextScale ? 1 : -1;
+	}, 180);
+}
 
 function haversine(lat1, lng1, lat2, lng2) {
 	const R = 6371;

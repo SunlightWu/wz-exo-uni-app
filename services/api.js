@@ -1,7 +1,23 @@
 // services/api.js
 // 服务端 HTTP API 封装 —— 仅真实请求，无 mock
 
-const REAL_BASE_URL = 'http://192.168.108.183:8080';
+// ── 环境配置 ──
+// 本地环境：不需要 api/ 前缀
+// 线上环境：所有 API 都需要加 api/ 前缀
+const ENV_CONFIG = {
+  local: {
+    baseUrl: 'http://192.168.108.183:8080',
+    apiPrefix: '',
+  },
+  online: {
+    baseUrl: 'http://82.157.81.90:80',
+    apiPrefix: 'api/',
+  },
+};
+
+// 切换环境：local | online
+const CURRENT_ENV = 'online';
+const { baseUrl: BASE_URL, apiPrefix: API_PREFIX } = ENV_CONFIG[CURRENT_ENV];
 
 // ── 安全关闭 loading（防止 showToast 替换后报错） ──
 export function safeHideLoading() {
@@ -45,7 +61,7 @@ async function doRefreshToken() {
   try {
     const res = await new Promise((resolve, reject) => {
       uni.request({
-        url: `${REAL_BASE_URL}/member/refresh`,
+        url: `${BASE_URL}/member/refresh`,
         method: 'POST',
         header: { 'Content-Type': 'application/json' },
         data: { refreshToken },
@@ -132,33 +148,44 @@ function httpRequest(method, url, data = null, options = {}) {
 
 export const api = {
   // ── 用户 ──
-  wxXcxLogin: (data) => httpRequest('POST', `${REAL_BASE_URL}/member/xcx/login`, data),
-  updateXcxProfile: (data) => httpRequest('POST', `${REAL_BASE_URL}/member/xcx/profile`, data),
-  getMemberInfo: () => httpRequest('GET', `${REAL_BASE_URL}/member/info`),
+  wxXcxLogin: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}member/xcx/login`, data),
+  wxXcxAuthLogin: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}member/xcx/auth-login`, data),
+  updateXcxProfile: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}member/xcx/profile`, data),
+  getMemberInfo: () => httpRequest('GET', `${BASE_URL}/${API_PREFIX}member/info`),
 
   // ==================== 外骨骼设备 ====================
 
   // ── 柜机 ──
-  getNearbyCabinets: (params) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/cabinet/nearby`, null, { params }),
-  getCabinetDetail: (cabinetNo) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/cabinet/${cabinetNo}`),
-  getCabinetDevices: (cabinetNo) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/cabinet/${cabinetNo}/devices`),
+  getNearbyCabinets: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/cabinet/nearby`, null, { params }),
+  getCabinetDetail: (id) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/${id}`),
+  getCabinetDevices: (cabinetNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/cabinet/${cabinetNo}/devices`),
 
   // ── 租借 ──
-  scanDevice: (deviceSn) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/lease/scan/${deviceSn}`),
-  scanCabinet: (cabinetNo, params) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/lease/scan/cabinet/${cabinetNo}`, null, { params }),
-  confirmLease: (data) => httpRequest('POST', `${REAL_BASE_URL}/api/v1/lease/confirm`, data),
-  returnDevice: (deviceSn) => httpRequest('POST', `${REAL_BASE_URL}/api/v1/lease/${deviceSn}/return`, { deviceSn }),
-  getLeaseStatusByTradeNo: (tradeNo) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/lease/${tradeNo}/status`),
-  uploadTrajectory: (tradeNo, points) => httpRequest('POST', `${REAL_BASE_URL}/api/v1/lease/${tradeNo}/trajectory`, { points }),
+  scanDevice: (deviceSn) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/scan/${deviceSn}`),
+  scanCabinet: (cabinetNo, params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/scan/cabinet/${cabinetNo}`, null, { params }),
+  confirmLease: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/confirm`, data),
+  returnDevice: (deviceSn, params) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${deviceSn}/return`, { deviceSn }, { params }),
+  depositConfirm: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/deposit-confirm`),
+  settleOrder: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/settle`),
+  getLeaseStatusByTradeNo: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/status`),
+  uploadTrajectory: (tradeNo, points) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/trajectory`, { points }),
+
+  // ── 支付 ──
+  createPayment: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/unified-order`, data),
+  paymentConfirm: (payNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/confirm?payNo=${payNo}`),
+  getPaymentStatus: (payNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/payment/${payNo}`),
+  getWechatStatus: (payNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/payment/wechat-status/${payNo}`),
 
   // ── 网点 ──
-  getNearbyPlaces: (params) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/places/nearby`, null, { params }),
-  getPlaceDetail: (id) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/places/${id}`),
+  getNearbyPlaces: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/places/nearby`, null, { params }),
+  getPlaceDetail: (id) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/places/${id}`),
 
   // ── 记录 ──
-  getMyOrders: (params) => httpRequest('GET', `${REAL_BASE_URL}/api/v1/record/order`, null, { params }),
+  getMyOrders: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/record/order`, null, { params }),
+  getPaymentRecords: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/record/payment`, null, { params }),
+  getOrderTrack: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/record/order/${tradeNo}/track`),
 
   // ── 轨迹 ──
-  reportTrajectory: (data) => httpRequest('POST', `${REAL_BASE_URL}/member/trajectory/report`, data),
-  getTrajectoryList: (deviceSn, startDate, endDate) => httpRequest('GET', `${REAL_BASE_URL}/member/trajectory/list`, null, { params: { deviceSn, startDate, endDate } }),
+  reportTrajectory: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}member/trajectory/report`, data),
+  getTrajectoryList: (deviceSn, startDate, endDate) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}member/trajectory/list`, null, { params: { deviceSn, startDate, endDate } }),
 };

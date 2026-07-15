@@ -118,6 +118,14 @@
 				"navigationBarBackgroundColor": "#f5f6fa",
 				"navigationBarTextStyle": "black"
 			}
+		},
+		{
+			"path": "pages/agreement/lease",
+			"style": {
+				"navigationBarTitleText": "租赁协议",
+				"navigationBarBackgroundColor": "#f5f6fa",
+				"navigationBarTextStyle": "black"
+			}
 		}
 	],
 	"globalStyle": {
@@ -126,6 +134,32 @@
 		"navigationBarBackgroundColor": "#f5f6fa",
 		"backgroundColor": "#f5f6fa",
 		"enablePullDownRefresh": false
+	},
+	"tabBar": {
+		"color": "#999999",
+		"selectedColor": "#306afc",
+		"backgroundColor": "#ffffff",
+		"borderStyle": "white",
+		"list": [
+			{
+				"pagePath": "pages/index/index",
+				"text": "首页",
+				"iconPath": "/static/tabbar/tab-home.png.png",
+				"selectedIconPath": "static/tabbar/tab-home-active.png"
+			},
+			{
+				"pagePath": "pages/history/list",
+				"text": "订单",
+				"iconPath": "static/tabbar/tab-order.png",
+				"selectedIconPath": "static/tabbar/tab-order-active.png"
+			},
+			{
+				"pagePath": "pages/profile/my",
+				"text": "我的",
+				"iconPath": "static/tabbar/tab-mine.png",
+				"selectedIconPath": "static/tabbar/tab-mine-active.png"
+			}
+		]
 	},
 	"uniIdRouter": {}
 }

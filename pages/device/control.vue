@@ -557,7 +557,18 @@
 						// 先停止轨迹采集并上传
 						stopTrajectoryCollection();
 						await uploadTrajectory();
-						const result = await api.returnDevice(store.leaseDeviceSn);
+						// 获取当前定位
+						const loc = await new Promise((resolve) => {
+							uni.getLocation({
+								type: 'gcj02',
+								success: (r) => resolve({ lng: r.longitude, lat: r.latitude }),
+								fail: () => resolve({ lng: null, lat: null }),
+							});
+						});
+						const returnParams = {};
+						if (loc.lng != null) returnParams.lng = loc.lng;
+						if (loc.lat != null) returnParams.lat = loc.lat;
+						const result = await api.returnDevice(store.leaseDeviceSn, returnParams);
 						if (result.code === 200) {
 							const deposit = store.leaseDeposit;
 							store.endLease();

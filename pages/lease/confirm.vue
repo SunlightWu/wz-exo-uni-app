@@ -23,7 +23,7 @@
 			</view>
 			<view class="rate-row">
 				<text class="rate-label">每日封顶</text>
-				<text class="rate-value">¥{{ deviceInfo.dailyCap || 120 }}</text>
+				<text class="rate-value">¥{{ (deviceInfo.dailyCap || 120).toFixed(2) }}</text>
 			</view>
 			<view class="rate-row">
 				<text class="rate-label">计费方式</text>

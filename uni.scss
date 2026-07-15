@@ -2,11 +2,11 @@
 // 先引入基础变量，然后在下方覆盖自定义值
 @import "/uni_modules/uview-next/theme.scss";
 
-// ── 覆盖 uview-next 主题色为外骨骼紫色系 ──
-$u-primary: #8B5CF6;
-$u-primary-dark: #7C3AED;
-$u-primary-disabled: #C4B5FD;
-$u-primary-light: #F3E8FF;
+// ── 覆盖 uview-next 主题色 ──
+$u-primary: #306afc;
+$u-primary-dark: #1a4fd9;
+$u-primary-disabled: #93b4fd;
+$u-primary-light: #e8f0fe;
 
 $u-success: #28C76F;
 $u-success-dark: #1FA85A;
@@ -27,12 +27,12 @@ $u-info-light: #F8F2FF;
 // ── 全局 Mixins（微信小程序不支持 :root CSS 变量，使用 SCSS 变量） ──
 $pageBg: #f0f4fa;
 $cardBg: #FFFFFF;
-$cardSoftBg: #F0E2FF;
-$borderColor: #E6D3F8;
-$textMainColor: #28123E;
-$textSubColor: #85689D;
-$primaryColor: #8B5CF6;
-$primaryLight: #A78BFA;
+$cardSoftBg: #e8f0fe;
+$borderColor: #bcd4fd;
+$textMainColor: #0d1b3e;
+$textSubColor: #5a7ab5;
+$primaryColor: #306afc;
+$primaryLight: #5d8eff;
 $successColor: #28C76F;
 $warningColor: #FFB547;
 $dangerColor: #FF5C7A;

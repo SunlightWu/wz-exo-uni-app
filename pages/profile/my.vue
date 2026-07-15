@@ -39,7 +39,7 @@
 		<!-- 白色内容区 -->
 		<view class="content-card">
 			<!-- 统计概览 -->
-			<view class="stats-row">
+			<!-- <view class="stats-row">
 				<view class="stat-item">
 					<text class="stat-num">{{ totalSessions }}</text>
 					<text class="stat-label">累计使用</text>
@@ -54,14 +54,14 @@
 					<text class="stat-num">{{ totalSteps }}</text>
 					<text class="stat-label">累计步数</text>
 				</view>
-			</view>
+			</view> -->
 
-			<view class="section-divider"></view>
+			<!-- <view class="section-divider"></view> -->
 
 			<!-- 功能菜单 -->
 			<view class="menu-list">
 				<!-- 押金 -->
-				<view class="menu-item" @click="goTo('/pages/profile/deposit')">
+				<!-- <view class="menu-item" @click="goTo('/pages/profile/deposit')">
 					<view class="menu-icon-wrap" style="background: rgba(139,92,246,0.10);">
 						<u-icon name="rmb-circle-fill" color="$primaryColor" size="22"></u-icon>
 					</view>
@@ -71,10 +71,10 @@
 						<text v-else class="menu-badge paid">已缴纳</text>
 					</view>
 					<u-icon name="arrow-right" color="#c0c4cc" size="16"></u-icon>
-				</view>
+				</view> -->
 
 				<!-- 我的订单 -->
-				<view class="menu-item" @click="goTo('/pages/history/list')">
+				<!-- <view class="menu-item" @click="goTo('/pages/history/list')">
 					<view class="menu-icon-wrap" style="background: rgba(93,142,240,0.10);">
 						<u-icon name="order" color="#5D8EF0" size="22"></u-icon>
 					</view>
@@ -85,7 +85,7 @@
 						<text v-if="activeOrderCount > 0" class="menu-dot">{{ activeOrderCount }}</text>
 						<u-icon name="arrow-right" color="#c0c4cc" size="16"></u-icon>
 					</view>
-				</view>
+				</view> -->
 
 				<!-- 我的卡券 -->
 				<!-- 		<view class="menu-item" @click="goTo('/pages/profile/coupon')">
@@ -278,6 +278,10 @@
 				// 保存会员ID
 				if (d.memberId) {
 					uni.setStorageSync('memberId', String(d.memberId))
+				}
+				// 保存 openId
+				if (d.openId) {
+					uni.setStorageSync('openId', d.openId)
 				}
 				// 后端返回用户信息则更新本地（兼容 null）
 				if (d.nickname || d.avatar) {
