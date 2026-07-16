@@ -62,6 +62,15 @@
 	</view>
 </template>
 
+<script>
+	export default {
+		onBackPress() {
+			uni.switchTab({ url: '/pages/index/index' });
+			return true;
+		}
+	}
+</script>
+
 <script setup>
 	import {
 		ref,
@@ -186,12 +195,6 @@
 		await loadExistingTrajectory();
 
 		initLeaseSession();
-	});
-
-	// 拦截返回键，点击返回直接回到首页
-	onBackPress(() => {
-		uni.switchTab({ url: '/pages/index/index' });
-		return true;
 	});
 
 	onUnmounted(() => {

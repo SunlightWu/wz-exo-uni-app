@@ -10,8 +10,7 @@
 		<!-- 地图区域 -->
 		<view class="map-area">
 			<map id="mapEl" ref="mapEl" class="map-view" :latitude="mapCenter.lat" :longitude="mapCenter.lng"
-				:markers="mapMarkers" :scale="mapScale" :enable-zoom="true" :enable-scroll="true"
-				:show-location="false"
+				:markers="mapMarkers" :scale="mapScale" :enable-zoom="true" :enable-scroll="true" :show-location="false"
 				@markertap="onMarkerTap" @regionchange="onRegionChange">
 				<view class="locate-center">
 					<image class="locate-center-img" src="/static/locate.png"></image>
@@ -25,7 +24,7 @@
 			</map>
 		</view>
 		<view style="height:240px" class="">
-			
+
 		</view>
 
 		<!-- 租赁中悬浮状态卡片 -->
@@ -78,18 +77,10 @@
 			</view>
 
 			<scroll-view class="cabinet-scroll" scroll-y enhanced :show-scrollbar="false">
-				<view
-					v-for="item in cabinetList"
-					:key="item.id"
-					class="cabinet-card"
-					@tap="goToCabinetDetail(item)"
-				>
+				<view v-for="item in cabinetList" :key="item.id" class="cabinet-card" @tap="goToCabinetDetail(item)">
 					<!-- 左侧图片 -->
-					<image
-						class="cabinet-img"
-						:src="item.imageUrl || item.image || '/static/wz_logo.png'"
-						mode="aspectFill"
-					></image>
+					<image class="cabinet-img" :src="item.imageUrl || item.image || '/static/wz_logo.png'"
+						mode="aspectFill"></image>
 
 					<!-- 中间信息 -->
 					<view class="cabinet-info">
@@ -97,7 +88,8 @@
 						<view class="cabinet-meta-row">
 							<u-icon name="map" color="#999" size="12"></u-icon>
 							<text class="cabinet-distance">约 {{ item.distanceText }}</text>
-							<view class="cabinet-status-tag" :class="item.status === 'online' || item.status === 'OPEN' || item.status === 1 ? 'status-open' : 'status-close'">
+							<view class="cabinet-status-tag"
+								:class="item.status === 'online' || item.status === 'OPEN' || item.status === 1 ? 'status-open' : 'status-close'">
 								<text>{{ item.status === 'online' || item.status === 'OPEN' || item.status === 1 ? '营业中' : '休息中' }}</text>
 							</view>
 							<text v-if="item.businessHours" class="cabinet-hours">{{ item.businessHours }}</text>
@@ -107,19 +99,21 @@
 							<text class="cabinet-address">{{ item.address || item.location || '暂无地址信息' }}</text>
 						</view>
 						<view class="cabinet-price-row">
-						<text class="cabinet-price">
-							¥{{ (item.feeTemplate?.hourlyRate ? (item.feeTemplate.hourlyRate / 100).toFixed(2) : item.rate || item.hourlyRate || '1.50') }}/小时
-						</text>
-						<text v-if="item.feeTemplate?.dailyCap || item.dailyCap || item.cap" class="cabinet-cap">
-							· 24小时封顶¥{{ item.feeTemplate?.dailyCap ? (item.feeTemplate.dailyCap / 100).toFixed(2) : item.dailyCap || item.cap || '30.00' }}
-						</text>
-					</view>
+							<text class="cabinet-price">
+								¥{{ (item.feeTemplate?.hourlyRate ? (item.feeTemplate.hourlyRate / 100).toFixed(2) : item.rate || item.hourlyRate || '1.50') }}/小时
+							</text>
+							<text v-if="item.feeTemplate?.dailyCap || item.dailyCap || item.cap" class="cabinet-cap">
+								·
+								24小时封顶¥{{ item.feeTemplate?.dailyCap ? (item.feeTemplate.dailyCap / 100).toFixed(2) : item.dailyCap || item.cap || '30.00' }}
+							</text>
+						</view>
 					</view>
 
 					<!-- 右侧数量 + 导航 -->
 					<view class="cabinet-right">
 						<view class="cabinet-count">
-							<text class="cabinet-count-num">{{ item.availableDevices || item.availableDeviceCount || 0 }}</text>
+							<text
+								class="cabinet-count-num">{{ item.availableDevices || item.availableDeviceCount || 0 }}</text>
 							<text class="cabinet-count-label">可借</text>
 						</view>
 						<view class="nav-btn" @tap.stop="openNavigation(item)">
@@ -162,7 +156,9 @@
 	import {
 		parseDeviceQr
 	} from '../../utils/qr-parser.js';
-	import { logout } from '../../services/auth.js';
+	import {
+		logout
+	} from '../../services/auth.js';
 	import BottomDrawer from '../../components/BottomDrawer.vue';
 
 	const deviceStore = useDeviceStore();
@@ -208,7 +204,8 @@
 
 
 
-	const totalAvailable = computed(() => cabinets.value.reduce((sum, c) => sum + (c.availableDevices || c.availableDeviceCount || 0), 0));
+	const totalAvailable = computed(() => cabinets.value.reduce((sum, c) => sum + (c.availableDevices || c
+		.availableDeviceCount || 0), 0));
 
 	// 租赁中时长与费用（实时计算）
 	const leaseDuration = ref('00:00');
@@ -296,7 +293,10 @@
 			name,
 			address: item.address || '',
 			fail: () => {
-				uni.showToast({ title: '无法打开导航', icon: 'none' });
+				uni.showToast({
+					title: '无法打开导航',
+					icon: 'none'
+				});
 			}
 		});
 	}
@@ -313,20 +313,30 @@
 				id: c.id ?? c.cabinetNo,
 				latitude: lat,
 				longitude: lng,
-				iconPath: '/static/marker-device.png',
-				width: 30,
-				height: 30,
+				iconPath: "/static/empty_trans.png",
+				width: 1,
+				height: 1,
+				// 锚点底部对齐，让气泡箭头对准位置
+				anchor: {
+					x: 0.5,
+					y: 1
+				},
 				callout: {
-					content: `可租 ${available} 台`,
-					color: '#fff',
+					content: `${available}\n可借`,
+					color: '#ffffff',
 					fontSize: 12,
-					borderRadius: 8,
-					borderColor:'#306afc',
-					bgColor: '#306afc',
-					padding: 6,
+					borderRadius: 12,
+					borderColor: '#3370fe',
+					bgColor: '#3370fe',
+					padding: 8,
 					display: 'ALWAYS',
 					textAlign: 'center',
-				},
+					anchorY: 1,
+					// 精准上移，气泡尖压住透明小点，完全遮挡
+					offsetY: -25,
+					// 关闭callout自带边框
+					borderWidth: 0
+				}
 			});
 		}
 		return markers;
@@ -337,7 +347,11 @@
 
 	async function checkActiveLease() {
 		try {
-			const res = await api.getMyOrders({ status: 1, pageNum: 1, pageSize: 1 });
+			const res = await api.getMyOrders({
+				status: 1,
+				pageNum: 1,
+				pageSize: 1
+			});
 			if ((res.code === 200 || res.code === 0) && res.data) {
 				const records = res.data.records || res.data.list || res.data || [];
 				if (records.length > 0) {
@@ -366,7 +380,11 @@
 
 	async function checkPendingPayment() {
 		try {
-			const res = await api.getMyOrders({ status: 2, pageNum: 1, pageSize: 1 });
+			const res = await api.getMyOrders({
+				status: 2,
+				pageNum: 1,
+				pageSize: 1
+			});
 			if ((res.code === 200 || res.code === 0) && res.data) {
 				const records = res.data.records || res.data.list || res.data || [];
 				if (records.length > 0) {
@@ -495,7 +513,10 @@
 						success: (res) => {
 							const lat = res.latitude;
 							const lng = res.longitude;
-							myLocation.value = { lat, lng };
+							myLocation.value = {
+								lat,
+								lng
+							};
 							// 拖动后不修改 mapCenter，让定位钉保持在屏幕中央
 							fetchNearbyCabinets(lng, lat);
 						},
@@ -515,7 +536,9 @@
 			const setting = await new Promise((resolve) => {
 				uni.getSetting({
 					success: resolve,
-					fail: () => resolve({ authSetting: {} })
+					fail: () => resolve({
+						authSetting: {}
+					})
 				});
 			});
 			if (!setting.authSetting || !setting.authSetting['scope.userLocation']) {
@@ -550,15 +573,24 @@
 			success: async (res) => {
 				const lat = res.latitude;
 				const lng = res.longitude;
-				myLocation.value = { lat, lng };
-				mapCenter.value = { lat, lng };
+				myLocation.value = {
+					lat,
+					lng
+				};
+				mapCenter.value = {
+					lat,
+					lng
+				};
 				mapScale.value = calcScaleByRadius(SEARCH_RADIUS);
 				locating.value = false;
 				reverseGeocode(lat, lng);
 				// 移动地图到当前位置（mapContext 已确保创建）
 				if (mapContext) {
 					skipRegionCount += 2;
-					mapContext.moveToLocation({ latitude: lat, longitude: lng });
+					mapContext.moveToLocation({
+						latitude: lat,
+						longitude: lng
+					});
 				}
 				await fetchNearbyCabinets(lng, lat);
 			},
@@ -571,7 +603,10 @@
 
 	function handleLocationFail() {
 		locationText.value = '北京市 · 朝阳区';
-		mapCenter.value = { lat: 39.9042, lng: 116.4074 };
+		mapCenter.value = {
+			lat: 39.9042,
+			lng: 116.4074
+		};
 		mapScale.value = calcScaleByRadius(SEARCH_RADIUS);
 		locating.value = false;
 		uni.showToast({
@@ -631,7 +666,11 @@
 		lastFetchLng = lng;
 		lastFetchLat = lat;
 		try {
-			const result = await api.getNearbyCabinets({ lng, lat, radius: SEARCH_RADIUS });
+			const result = await api.getNearbyCabinets({
+				lng,
+				lat,
+				radius: SEARCH_RADIUS
+			});
 			if (result.code === 0 || result.code === 200) {
 				cabinets.value = result.data || [];
 			} else {
@@ -653,19 +692,31 @@
 				const lat = res.latitude;
 				const lng = res.longitude;
 				locating.value = false;
-				myLocation.value = { lat, lng };
-				mapCenter.value = { lat, lng };
+				myLocation.value = {
+					lat,
+					lng
+				};
+				mapCenter.value = {
+					lat,
+					lng
+				};
 				mapScale.value = calcScaleByRadius(SEARCH_RADIUS); // 重置缩放比例
 				// 移动地图到当前位置
 				if (mapContext) {
 					skipRegionCount += 2;
-					mapContext.moveToLocation({ latitude: lat, longitude: lng });
+					mapContext.moveToLocation({
+						latitude: lat,
+						longitude: lng
+					});
 				}
 				fetchNearbyCabinets(lng, lat);
 			},
 			fail: () => {
 				locating.value = false;
-				uni.showToast({ title: '定位失败', icon: 'none' });
+				uni.showToast({
+					title: '定位失败',
+					icon: 'none'
+				});
 			},
 		});
 	}
@@ -714,21 +765,27 @@
 	async function doSilentLogin() {
 		try {
 			const loginRes = await new Promise((resolve, reject) => {
-				uni.login({ provider: 'weixin', success: resolve, fail: reject })
+				uni.login({
+					provider: 'weixin',
+					success: resolve,
+					fail: reject
+				})
 			})
-			const result = await api.wxXcxLogin({ code: loginRes.code })
+			const result = await api.wxXcxLogin({
+				code: loginRes.code
+			})
 			if (result.code === 200 && result.data) {
 				uni.setStorageSync('token', result.data.token)
 				if (result.data.refreshToken) {
 					uni.setStorageSync('refreshToken', result.data.refreshToken)
 				}
 				if (result.data.memberId) {
-				uni.setStorageSync('memberId', String(result.data.memberId))
-			}
-			if (result.data.openId) {
-				uni.setStorageSync('openId', result.data.openId)
-			}
-			console.log('[Index] 静默登录成功')
+					uni.setStorageSync('memberId', String(result.data.memberId))
+				}
+				if (result.data.openId) {
+					uni.setStorageSync('openId', result.data.openId)
+				}
+				console.log('[Index] 静默登录成功')
 			}
 		} catch (err) {
 			console.error('[Index] 静默登录失败:', err.message || err)
@@ -824,10 +881,12 @@
 		height: 36px;
 		pointer-events: none;
 	}
+
 	.locate-center-img {
 		width: 36px;
 		height: 36px;
 	}
+
 	.locate-label {
 		position: absolute;
 		top: 36px;
@@ -837,7 +896,7 @@
 		color: $primaryColor;
 		font-weight: 700;
 		white-space: nowrap;
-		background: rgba(255,255,255,0.9);
+		background: rgba(255, 255, 255, 0.9);
 		padding: 2px 8px;
 		border-radius: 8px;
 		margin-top: 2px;
@@ -870,7 +929,7 @@
 		width: 40px;
 		height: 40px;
 		border-radius: 12px;
-		background:#f0f4fa;
+		background: #f0f4fa;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -1195,5 +1254,4 @@
 	.pending-float-btn:active {
 		opacity: 0.8;
 	}
-
 </style>
