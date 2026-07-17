@@ -18,7 +18,7 @@
 						<text class="header-cabinet-no">柜机编号：{{ cabinet.cabinetNo || cabinet.id || '-' }}</text>
 					</view>
 				</view>
-				<image class="header-img" src="/static/wz_logo.png" mode="aspectFill"></image>
+				<image class="header-img" :src="cabinet.imageUrl ? BASE_URL + cabinet.imageUrl : (cabinet.image ? BASE_URL + cabinet.image : '/static/wz_logo.png')" mode="aspectFill"></image>
 			</view>
 
 
@@ -30,29 +30,30 @@
 					<text class="slot-title-line"></text>
 				</view>
 
-				<view class="slot-grid">
-					<view v-for="slot in slotList" :key="slot.id" class="slot-item" :class="[
-							slotStatusClass(slot.status),
-							{ 'slot-selected': selectedSlot?.id === slot.id }
-						]" @click="onSlotClick(slot)">
-						<!-- 选中对勾 -->
-						<view v-if="selectedSlot?.id === slot.id" class="slot-check">✓</view>
-						<!-- 编号 -->
-						<text class="slot-num">{{ slot.slotNo }}</text>
-						<!-- 设备图标 -->
-						<view class="slot-icon-wrap">
-							<image class="slot-icon" src="/static/exo_view1.png" mode="aspectFit"
-								:class="{ 'slot-icon-gray': slot.status !== 'available' }"></image>
-						</view>
-						<!-- 状态 -->
-						<view class="slot-status">
-							<view class="slot-status-dot" :class="slotStatusDotClass(slot.status)"></view>
-							<text class="slot-status-text">{{ slotStatusLabel(slot.status) }}</text>
-						</view>
-						<!-- 已选文字 -->
-						<!-- <text v-if="selectedSlot?.id === slot.id" class="slot-selected-text">已选 {{ slot.slotNo }}号仓</text> -->
+			<view class="slot-grid">
+				<view v-for="slot in slotList" :key="slot.id" class="slot-item" :class="[
+						slotStatusClass(slot.status),
+						{ 'slot-selected': selectedSlot?.id === slot.id }
+					]" @click="onSlotClick(slot)">
+					<!-- 选中对勾 -->
+					<view v-if="selectedSlot?.id === slot.id" class="slot-check">✓</view>
+					<!-- 编号 -->
+					<text class="slot-num">{{ slot.slotNo }}</text>
+					<!-- 设备图标 -->
+					<view class="slot-icon-wrap">
+						<image v-if="slot.imageUrl" class="slot-icon" :src="BASE_URL + slot.imageUrl" mode="aspectFit"
+							:class="{ 'slot-icon-gray': slot.status !== 'available' }"></image>
+						<image v-else class="slot-icon slot-icon-empty" src="/static/equipment-empty.png" mode="aspectFit"></image>
 					</view>
+					<!-- 状态 -->
+					<view class="slot-status">
+						<view class="slot-status-dot" :class="slotStatusDotClass(slot.status)"></view>
+						<text class="slot-status-text">{{ slotStatusLabel(slot.status) }}</text>
+					</view>
+					<!-- 已选文字 -->
+					<!-- <text v-if="selectedSlot?.id === slot.id" class="slot-selected-text">已选 {{ slot.slotNo }}号仓</text> -->
 				</view>
+			</view>
 
 				<!-- 图例 -->
 				<view class="slot-legend">
@@ -77,7 +78,7 @@
 
 			<!-- 选中设备信息 -->
 			<view v-if="selectedSlot && selectedSlot.device" class="device-info-card">
-				<image class="device-img" src="/static/exo_view1.png" mode="aspectFit"></image>
+				<image class="device-img" :src="BASE_URL + selectedSlot.device.imageUrl" mode="aspectFit"></image>
 				<view class="device-info-main">
 					<view class="info-row">
 						<text class="info-label">设备型号：</text>
@@ -201,7 +202,8 @@
 		onMounted
 	} from 'vue';
 	import {
-		api
+		api,
+		BASE_URL
 	} from '../../services/api.js';
 	import {
 		parseDeviceQr
@@ -270,6 +272,7 @@
 				slotNo: String(slot.slotNo).padStart(2, '0'),
 				status: hasDevice ? mapDeviceStatus(slot.deviceStatus) : 'empty',
 				device: hasDevice ? slot : null,
+				imageUrl: slot.imageUrl || '',
 			};
 		});
 	});
@@ -867,6 +870,11 @@
 	.slot-icon-gray {
 		opacity: 0.4;
 		filter: grayscale(100%);
+	}
+
+	.slot-icon-empty {
+		width: 60%;
+		height: 60%;
 	}
 
 	.slot-status {

@@ -79,7 +79,7 @@
 			<scroll-view class="cabinet-scroll" scroll-y enhanced :show-scrollbar="false">
 				<view v-for="item in cabinetList" :key="item.id" class="cabinet-card" @tap="goToCabinetDetail(item)">
 					<!-- 左侧图片 -->
-					<image class="cabinet-img" :src="item.imageUrl || item.image || '/static/wz_logo.png'"
+					<image class="cabinet-img" :src="item.imageUrl ? BASE_URL + item.imageUrl : (item.image ? BASE_URL + item.image : '/static/wz_logo.png')"
 						mode="aspectFill"></image>
 
 					<!-- 中间信息 -->
@@ -147,7 +147,8 @@
 		useDeviceStore
 	} from '../../store/device.js';
 	import {
-		api
+		api,
+		BASE_URL
 	} from '../../services/api.js';
 	import {
 		reportLocation,

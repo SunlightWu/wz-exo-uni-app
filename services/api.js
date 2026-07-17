@@ -20,6 +20,8 @@ const CURRENT_ENV = 'online';
 const { baseUrl: BASE_URL, apiPrefix: API_PREFIX } = ENV_CONFIG[CURRENT_ENV];
 
 // ── 安全关闭 loading（防止 showToast 替换后报错） ──
+export { BASE_URL };
+
 export function safeHideLoading() {
   try {
     uni.hideLoading();
