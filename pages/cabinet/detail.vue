@@ -190,9 +190,9 @@
 				</view>
 			</view>
 
-			<view style="height: 20px;"></view>
-		</template>
-	</view>
+			<view style="height: calc(20px + env(safe-area-inset-bottom));"></view>
+	</template>
+</view>
 </template>
 
 <script setup>
@@ -714,20 +714,25 @@
 		color: #666;
 		margin-top: 2px;
 		line-height: 1.4;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 220px;
 	}
 
 	.header-cabinet-no {
-		font-size: 11px;
-		color: #999;
+		font-size: 10px;
+		color: #bbb;
 		margin-top: 2px;
 	}
 
 	.header-img {
-		width: 64px;
-		height: 64px;
-		border-radius: 10px;
+		width: 72px;
+		height: 72px;
+		border-radius: 12px;
 		background: #f5f6fa;
 		flex-shrink: 0;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 	}
 
 	/* 价格信息 */
@@ -822,12 +827,21 @@
 
 	.slot-item.slot-empty {
 		background: #fafafa;
-		border: 2px dashed #e0e0e0;
+		border: 1px dashed #e8e8e8;
 	}
 
 	.slot-item.slot-selected {
-		border-color: #3b82f6;
-		background: #eff6ff;
+		border-color: #306afc;
+		background: rgba(48, 106, 252, 0.06);
+	}
+
+	.slot-item.slot-rented,
+	.slot-item.slot-maintain {
+		opacity: 0.7;
+	}
+
+	.slot-item:active:not(.slot-empty):not(.slot-rented):not(.slot-maintain) {
+		transform: scale(0.96);
 	}
 
 	.slot-check {
@@ -837,7 +851,7 @@
 		width: 16px;
 		height: 16px;
 		border-radius: 50%;
-		background: #3b82f6;
+		background: #306afc;
 		color: #fff;
 		font-size: 10px;
 		display: flex;
@@ -914,7 +928,7 @@
 
 	.slot-selected-text {
 		font-size: 9px;
-		color: #3b82f6;
+		color: #306afc;
 		font-weight: 600;
 	}
 
@@ -970,12 +984,27 @@
 		align-items: flex-start;
 		gap: 12px;
 		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.device-info-card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 16px;
+		right: 16px;
+		height: 3px;
+		background: #306afc;
+		border-radius: 0 0 2px 2px;
 	}
 
 	.device-img {
-		width: 60px;
-		height: 60px;
+		width: 72px;
+		height: 72px;
 		flex-shrink: 0;
+		border-radius: 8px;
+		background: #f8f8f8;
 	}
 
 	.device-info-main {
@@ -1049,8 +1078,8 @@
 	}
 
 	.agree-check.checked {
-		background: #3b82f6;
-		border-color: #3b82f6;
+		background: #306afc;
+		border-color: #306afc;
 	}
 
 	.agree-text {
@@ -1061,7 +1090,7 @@
 
 	.agree-link {
 		font-size: 12px;
-		color: #3b82f6;
+		color: #306afc;
 		font-weight: 600;
 		flex-shrink: 0;
 	}
@@ -1074,7 +1103,7 @@
 	.confirm-btn {
 		width: 100%;
 		height: 52px;
-		background: #3b82f6;
+		background: #306afc;
 		border-radius: 12px;
 		display: flex;
 		flex-direction: column;
@@ -1082,6 +1111,7 @@
 		justify-content: center;
 		gap: 1px;
 		color: #fff;
+		box-shadow: 0 4px 12px rgba(48, 106, 252, 0.3);
 		transition: opacity 0.2s;
 	}
 

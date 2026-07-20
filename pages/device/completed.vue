@@ -45,7 +45,7 @@
 			</view>
 			<view class="info-row">
 				<text class="info-label">使用时间</text>
-				<text class="info-value highlight">{{ formatDuration(orderData.pickupTime, orderData.returnTime) }}</text>
+				<text class="info-value highlight">{{ formatDurationFull(orderData.pickupTime, orderData.returnTime) }}</text>
 			</view>
 			<view class="info-row">
 				<text class="info-label">开始</text>
@@ -110,7 +110,7 @@
 			</view>
 			<view class="track-stats">
 				<text class="track-stat">共 {{ trackPoints.length }} 个轨迹点</text>
-				<text class="track-stat">时长 {{ formatDuration(orderData.pickupTime, orderData.returnTime) }}</text>
+				<text class="track-stat">时长 {{ formatDurationFull(orderData.pickupTime, orderData.returnTime) }}</text>
 			</view>
 		</view>
 		<view v-else-if="trackLoaded" class="info-card">
@@ -139,6 +139,7 @@
 import { reactive, computed, ref, onMounted, nextTick } from 'vue';
 import { onLoad, onUnload } from '@dcloudio/uni-app';
 import { api } from '../../services/api.js';
+import { formatDateTime, formatDurationFull } from '../../utils/format.js';
 import { useDeviceStore } from '../../store/device.js';
 
 const deviceStore = useDeviceStore();
@@ -363,28 +364,6 @@ async function loadOrderDetail(tradeNo) {
 		console.error('获取订单详情失败', e);
 		uni.showToast({ title: '获取订单详情失败', icon: 'none' });
 	}
-}
-
-function formatDateTime(dt) {
-	if (!dt) return '-';
-	const d = new Date(dt);
-	if (isNaN(d.getTime())) return dt;
-	const pad = (n) => String(n).padStart(2, '0');
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function formatDuration(start, end) {
-	if (!start || !end) return '-';
-	const s = new Date(start).getTime();
-	const e = new Date(end).getTime();
-	if (isNaN(s) || isNaN(e)) return '-';
-	const diff = Math.floor((e - s) / 1000);
-	const h = Math.floor(diff / 3600);
-	const m = Math.floor((diff % 3600) / 60);
-	const sec = diff % 60;
-	if (h > 0) return `${h}小时${m}分${sec}秒`;
-	if (m > 0) return `${m}分${sec}秒`;
-	return `${sec}秒`;
 }
 
 async function loadTrack(tradeNo) {

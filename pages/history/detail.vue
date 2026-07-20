@@ -67,7 +67,7 @@
 			</view>
 			<view class="info-row">
 				<text class="info-label">创建时间</text>
-				<text class="info-value">{{ formatDateTime(order.createTime) }}</text>
+				<text class="info-value">{{ formatDateTimeFull(order.createTime) }}</text>
 			</view>
 		</view>
 
@@ -79,15 +79,15 @@
 			</view>
 			<view class="info-row">
 				<text class="info-label">开始时间</text>
-				<text class="info-value">{{ formatDateTime(order.pickupTime) }}</text>
+				<text class="info-value">{{ formatDateTimeFull(order.pickupTime) }}</text>
 			</view>
 			<view class="info-row">
 				<text class="info-label">结束时间</text>
-				<text class="info-value">{{ formatDateTime(order.returnTime) }}</text>
+				<text class="info-value">{{ formatDateTimeFull(order.returnTime) }}</text>
 			</view>
 			<view class="info-row">
 				<text class="info-label">使用时长</text>
-				<text class="info-value highlight">{{ formatDuration(order.pickupTime, order.returnTime) }}</text>
+				<text class="info-value highlight">{{ formatDurationFull(order.pickupTime, order.returnTime) }}</text>
 			</view>
 		</view>
 
@@ -163,6 +163,7 @@
 <script setup>
 import { reactive, computed, onMounted } from 'vue';
 import { api } from '../../services/api.js';
+import { formatDateTimeFull, formatDurationFull } from '../../utils/format.js';
 
 const order = reactive({
 	tradeNo: '',
@@ -268,27 +269,6 @@ async function loadOrderDetail(tradeNo) {
 	}
 }
 
-function formatDateTime(dt) {
-	if (!dt) return '-';
-	const d = new Date(dt);
-	if (isNaN(d.getTime())) return dt;
-	const pad = (n) => String(n).padStart(2, '0');
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-
-function formatDuration(start, end) {
-	if (!start || !end) return '-';
-	const s = new Date(start).getTime();
-	const e = new Date(end).getTime();
-	if (isNaN(s) || isNaN(e)) return '-';
-	const diff = Math.floor((e - s) / 1000);
-	const h = Math.floor(diff / 3600);
-	const m = Math.floor((diff % 3600) / 60);
-	const sec = diff % 60;
-	if (h > 0) return `${h}小时${m}分${sec}秒`;
-	if (m > 0) return `${m}分${sec}秒`;
-	return `${sec}秒`;
-}
 </script>
 
 <style scoped lang="scss">

@@ -10,7 +10,6 @@
 				@click="onFilterChange(tab.value)"
 			>
 				<text class="filter-text">{{ tab.label }}</text>
-				<view v-if="currentFilter === tab.value" class="filter-indicator"></view>
 			</view>
 		</scroll-view>
 
@@ -30,12 +29,15 @@
 					class="order-card"
 					@click="onOrderClick(item)"
 				>
-					<!-- 顶部：状态 + 编号 -->
+					<!-- 头部：状态标签 + 支付金额 -->
 					<view class="card-header">
 						<view class="status-badge" :class="statusClass(item.status ?? item.state)">
 							<text class="status-text">{{ statusLabel(item.status ?? item.state) }}</text>
 						</view>
-						<text class="trade-no">{{ item.tradeNo }}</text>
+						<view class="header-right">
+							<text class="header-cost-label">支付</text>
+							<text class="header-cost">¥{{ (item.payMoney / 100).toFixed(2) }}</text>
+						</view>
 					</view>
 
 					<!-- 中部：设备信息 -->
@@ -45,26 +47,23 @@
 							<text class="body-value">{{ item.deviceName || item.deviceSn }}</text>
 						</view>
 						<view class="body-row">
-							<text class="body-label">租借时间</text>
+							<text class="body-label">租借</text>
 							<text class="body-value">{{ formatDateTime(item.pickupTime) }}</text>
 						</view>
 						<view v-if="item.returnTime" class="body-row">
-							<text class="body-label">归还时间</text>
+							<text class="body-label">归还</text>
 							<text class="body-value">{{ formatDateTime(item.returnTime) }}</text>
 						</view>
 						<view class="body-row">
 							<text class="body-label">押金</text>
-							<text class="body-value highlight">¥{{ (item.depositMoney / 100).toFixed(2) }}</text>
+							<text class="body-value">¥{{ (item.depositMoney / 100).toFixed(2) }}</text>
 						</view>
 					</view>
 
-					<!-- 底部：费用 -->
+					<!-- 底部：编号 + 箭头 -->
 					<view class="card-footer">
-						<view class="footer-info">
-							<text class="footer-label">支付金额</text>
-							<text class="footer-cost">¥{{ (item.payMoney / 100).toFixed(2) }}</text>
-						</view>
-						<text class="footer-arrow">›</text>
+						<text class="trade-no">订单 {{ item.tradeNo }}</text>
+						<u-icon name="arrow-right" color="#ccc" size="16"></u-icon>
 					</view>
 				</view>
 			</view>
@@ -77,8 +76,11 @@
 
 			<!-- 空状态 -->
 			<view v-if="orders.length === 0 && !loading" class="empty-wrap">
-				<text class="empty-icon">📋</text>
+				<image class="empty-img" src="/static/equipment-empty.png" mode="aspectFit"></image>
 				<text class="empty-title">暂无订单记录</text>
+				<view class="scan-btn" @click="goToIndex">
+					<text class="scan-btn-text">去租借</text>
+				</view>
 			</view>
 		</scroll-view>
 	</view>
@@ -88,7 +90,9 @@
 import { ref, onMounted } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { api } from '../../services/api.js';
+import { formatDateTime } from '../../utils/format.js';
 
+const statusBarHeight = ref(20);
 const orders = ref([]);
 const loading = ref(true);
 const refreshing = ref(false);
@@ -107,7 +111,9 @@ const filterTabs = [
 	{ label: '已取消', value: '4' },
 ];
 
-onMounted(() => {
+onMounted(async () => {
+	const sys = await uni.getSystemInfo();
+	statusBarHeight.value = sys.statusBarHeight || 20;
 	loadOrders();
 });
 
@@ -212,12 +218,8 @@ function onOrderClick(item) {
 	}
 }
 
-function formatDateTime(dt) {
-	if (!dt) return '--';
-	const d = new Date(dt);
-	if (isNaN(d.getTime())) return dt;
-	const pad = (n) => String(n).padStart(2, '0');
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function goToIndex() {
+	uni.switchTab({ url: '/pages/index/index' });
 }
 
 </script>
@@ -230,12 +232,17 @@ function formatDateTime(dt) {
 	flex-direction: column;
 }
 
+.status-bar {
+	background: #fff;
+	flex-shrink: 0;
+}
+
 /* 筛选栏 */
 .filter-bar {
 	display: flex;
 	white-space: nowrap;
 	background: #fff;
-	padding: 0 8px;
+	padding: 8px 16px;
 	border-bottom: 1px solid #f0f0f0;
 	position: sticky;
 	top: 0;
@@ -244,31 +251,25 @@ function formatDateTime(dt) {
 
 .filter-tab {
 	display: inline-flex;
-	flex-direction: column;
 	align-items: center;
-	padding: 12px 16px 8px;
-	position: relative;
+	padding: 6px 14px;
+	border-radius: 20px;
+	transition: all 0.2s;
+}
+
+.filter-tab.active {
+	background: rgba(48, 106, 252, 0.08);
 }
 
 .filter-text {
-	font-size: 14px;
+	font-size: 13px;
 	color: #666;
 	font-weight: 600;
-	transition: color 0.2s;
 }
 
 .filter-tab.active .filter-text {
 	color: $primaryColor;
 	font-weight: 700;
-}
-
-.filter-indicator {
-	position: absolute;
-	bottom: 0;
-	width: 20px;
-	height: 3px;
-	background: $primaryColor;
-	border-radius: 2px;
 }
 
 /* 列表滚动区 */
@@ -284,14 +285,15 @@ function formatDateTime(dt) {
 .order-card {
 	background: #fff;
 	border-radius: 16px;
-	padding: 16px;
+	padding: 14px 16px;
 	margin-bottom: 12px;
 	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-	transition: opacity 0.15s;
+	transition: transform 0.15s;
 }
 
 .order-card:active {
-	opacity: 0.7;
+	transform: scale(0.985);
+	background: #fafafa;
 }
 
 /* 头部 */
@@ -299,16 +301,16 @@ function formatDateTime(dt) {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 14px;
+	margin-bottom: 12px;
 }
 
 .status-badge {
-	padding: 4px 12px;
+	padding: 3px 10px;
 	border-radius: 8px;
 }
 
 .status-badge.active {
-	background: rgba(139, 92, 246, 0.1);
+	background: rgba(48, 106, 252, 0.1);
 }
 
 .status-badge.done {
@@ -333,7 +335,7 @@ function formatDateTime(dt) {
 }
 
 .status-badge.done .status-text {
-	color: #28C76F;
+	color: #28c76f;
 }
 
 .status-badge.pending .status-text {
@@ -344,40 +346,53 @@ function formatDateTime(dt) {
 	color: #999;
 }
 
-.trade-no {
-	font-size: 12px;
-	color: #bbb;
-	font-family: monospace;
+.header-right {
+	display: flex;
+	align-items: baseline;
+	gap: 4px;
+}
+
+.header-cost-label {
+	font-size: 11px;
+	color: #999;
+}
+
+.header-cost {
+	font-size: 18px;
+	font-weight: 900;
+	color: $primaryColor;
 }
 
 /* 内容 */
 .card-body {
 	border-top: 1px solid #f5f6fa;
 	border-bottom: 1px solid #f5f6fa;
-	padding: 12px 0;
+	padding: 10px 0;
 }
 
 .body-row {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	padding: 4px 0;
+	padding: 3px 0;
 }
 
 .body-label {
-	font-size: 13px;
+	font-size: 12px;
 	color: #999;
+	width: 40px;
+	flex-shrink: 0;
 }
 
 .body-value {
 	font-size: 13px;
 	font-weight: 600;
 	color: #333;
-}
-
-.body-value.highlight {
-	color: $primaryColor;
-	font-weight: 700;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: right;
 }
 
 /* 底部 */
@@ -385,30 +400,12 @@ function formatDateTime(dt) {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding-top: 12px;
+	padding-top: 10px;
 }
 
-.footer-info {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
-
-.footer-label {
-	font-size: 12px;
-	color: #999;
-}
-
-.footer-cost {
-	font-size: 16px;
-	font-weight: 800;
-	color: $primaryColor;
-}
-
-.footer-arrow {
-	font-size: 20px;
+.trade-no {
+	font-size: 11px;
 	color: #ccc;
-	font-weight: 300;
 }
 
 /* 加载状态 */
@@ -428,35 +425,36 @@ function formatDateTime(dt) {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	padding-top: 120px;
+	padding-top: 100px;
 	gap: 10px;
 }
 
-.empty-icon {
-	font-size: 52px;
+.empty-img {
+	width: 100px;
+	height: 100px;
 }
 
 .empty-title {
-	font-size: 15px;
+	font-size: 14px;
 	font-weight: 600;
 	color: #999;
 }
 
 .scan-btn {
-	margin-top: 16px;
-	width: 200px;
-	padding: 14px 0;
+	margin-top: 20px;
+	width: 180px;
+	padding: 12px 0;
 	background: $primaryColor;
-	border-radius: 28px;
+	border-radius: 24px;
 	text-align: center;
 }
 
 .scan-btn:active {
-	opacity: 0.8;
+	opacity: 0.85;
 }
 
 .scan-btn-text {
-	font-size: 16px;
+	font-size: 15px;
 	font-weight: 700;
 	color: #fff;
 }

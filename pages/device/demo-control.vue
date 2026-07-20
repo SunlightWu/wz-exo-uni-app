@@ -1,13 +1,8 @@
 <template>
 	<view class="demo-page">
-		<view class="device-bar">
-			<image class="device-icon-sm" src="/static/exo_view1.png" mode="aspectFit" />
-			<text class="device-name">{{ deviceName }}</text>
-		</view>
-
 		<!-- 大号计时器 -->
 		<view class="timer-card">
-			<view class="timer-ring">
+			<view class="timer-ring" :class="{ paused: !isRunning }">
 				<view class="timer-inner">
 					<text class="timer-label">使用时长</text>
 					<text class="timer-value">{{ formattedTime }}</text>
@@ -24,7 +19,7 @@
 			<view class="cost-row">
 				<view class="cost-item">
 					<text class="cost-label">当前费用</text>
-					<text class="cost-num">¥{{ currentCost.toFixed(2) }}</text>
+					<text class="cost-num cost-num-primary">¥{{ currentCost.toFixed(2) }}</text>
 				</view>
 				<view class="cost-divider"></view>
 				<view class="cost-item">
@@ -40,15 +35,18 @@
 			<view v-if="freeMinutes > 0" class="cost-hint">
 				<text>前 {{ freeMinutes }} 分钟免费，已减免 ¥{{ freeDiscount.toFixed(2) }}</text>
 			</view>
-			<view class="cost-hint cost-rule-hint">
+			<view v-if="elapsedSeconds > freeMinutes * 60" class="cost-hint cost-rule-hint">
 				<text>不足1小时按1小时计费</text>
 			</view>
 		</view>
 
 		<!-- 运动轨迹 -->
 		<view class="trajectory-section">
-			<text class="section-title">📍 运动轨迹</text>
-			<TrajectoryMap :points="trajectoryPoints" height="200px" :show-location="false" />
+			<text class="section-title">运动轨迹</text>
+			<TrajectoryMap v-if="trajectoryPoints.length > 0" :points="trajectoryPoints" height="200px" :show-location="false" />
+			<view v-else class="trajectory-empty">
+				<text class="trajectory-empty-text">暂无轨迹数据</text>
+			</view>
 		</view>
 
 		<!-- 结束体验 -->
@@ -58,7 +56,7 @@
 			</view>
 		</view>
 
-		<view style="height: 30px;"></view>
+		<view style="height: calc(30px + env(safe-area-inset-bottom));"></view>
 	</view>
 </template>
 
@@ -82,6 +80,9 @@
 	import {
 		api
 	} from '../../services/api.js';
+	import {
+		parseDate
+	} from '../../utils/format.js';
 	import {
 		reportLocation,
 		resetLocationDedup
@@ -185,6 +186,7 @@
 		const page = pages[pages.length - 1];
 		const query = page.options || page.$page?.options || page.$route?.query || {};
 		deviceName.value = decodeURIComponent(query.name || '') || '外骨骼设备';
+		uni.setNavigationBarTitle({ title: deviceName.value });
 		tradeNo.value = query.tradeNo || '';
 		deviceSn.value = query.deviceSn || '';
 		cabinetId.value = query.cabinetId || '';
@@ -257,7 +259,7 @@
 		const longitude = Number(point.longitude ?? point.lng);
 		if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
 		const rawTime = point.timestamp || point.reportTime || point.createTime || point.time || Date.now();
-		const timestampMs = typeof rawTime === 'number' ? rawTime : new Date(rawTime).getTime();
+		const timestampMs = typeof rawTime === 'number' ? rawTime : parseDate(rawTime).getTime();
 		return {
 			...point,
 			latitude,
@@ -370,26 +372,6 @@
 		padding: 16px;
 	}
 
-	/* 设备名称 */
-	.device-bar {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-bottom: 16px;
-	}
-
-	.device-icon-sm {
-		width: 36px;
-		height: 36px;
-		border-radius: 8px;
-	}
-
-	.device-name {
-		font-size: 16px;
-		font-weight: 800;
-		color: #333;
-	}
-
 	/* 大号计时器 */
 	.timer-card {
 		background: #fff;
@@ -433,6 +415,10 @@
 		}
 	}
 
+	.timer-ring.paused::before {
+		animation-play-state: paused;
+	}
+
 	.timer-inner {
 		display: flex;
 		flex-direction: column;
@@ -464,7 +450,7 @@
 	}
 
 	.timer-status.running {
-		background: rgba(139, 92, 246, 0.08);
+		background: rgba(48, 106, 252, 0.08);
 	}
 
 	.status-dot {
@@ -534,6 +520,11 @@
 		color: #333;
 	}
 
+	.cost-num-primary {
+		color: $primaryColor;
+		font-size: 20px;
+	}
+
 	.cost-divider {
 		width: 1px;
 		height: 30px;
@@ -576,15 +567,34 @@
 
 	.finish-btn {
 		width: 100%;
-		height: 48px;
+		height: 52px;
 		background: linear-gradient(135deg, $primaryColor, $primaryLight);
 		border-radius: 12px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		font-size: 15px;
+		font-size: 16px;
 		font-weight: 700;
 		color: #fff;
-		box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+		box-shadow: 0 4px 16px rgba(48, 106, 252, 0.3);
+	}
+
+	.finish-btn:active {
+		opacity: 0.85;
+	}
+
+	/* 轨迹空状态 */
+	.trajectory-empty {
+		height: 200px;
+		background: #fff;
+		border-radius: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.trajectory-empty-text {
+		font-size: 13px;
+		color: #bbb;
 	}
 </style>

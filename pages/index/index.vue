@@ -11,7 +11,7 @@
 		<view class="map-area">
 			<map id="mapEl" ref="mapEl" class="map-view" :latitude="mapCenter.lat" :longitude="mapCenter.lng"
 				:markers="mapMarkers" :scale="mapScale" :enable-zoom="true" :enable-scroll="true" :show-location="false"
-				@markertap="onMarkerTap" @regionchange="onRegionChange">
+				@markertap="onMarkerTap" @callouttap="onMarkerTap" @regionchange="onRegionChange">
 				<view class="locate-center">
 					<image class="locate-center-img" src="/static/locate.png"></image>
 				</view>
@@ -70,10 +70,10 @@
 					<text class="drawer-title">附近租借点</text>
 					<text class="drawer-subtitle">为你推荐附近的可租借点</text>
 				</view>
-				<!-- <view class="list-mode-btn" @tap="goToCabinetList">
-					<text>列表模式</text>
+				<view class="list-mode-btn" @tap="goToCabinetList">
+					<text>列表</text>
 					<u-icon name="list-dot" color="#306afc" size="16"></u-icon>
-				</view> -->
+				</view>
 			</view>
 
 			<scroll-view class="cabinet-scroll" scroll-y enhanced :show-scrollbar="false">
@@ -86,7 +86,7 @@
 					<view class="cabinet-info">
 						<text class="cabinet-name">{{ item.cabinetName || item.name || '柜机' }}</text>
 						<view class="cabinet-meta-row">
-							<u-icon name="map" color="#999" size="12"></u-icon>
+							<u-icon name="map-pin" color="#999" size="12"></u-icon>
 							<text class="cabinet-distance">约 {{ item.distanceText }}</text>
 							<view class="cabinet-status-tag"
 								:class="item.status === 'online' || item.status === 'OPEN' || item.status === 1 ? 'status-open' : 'status-close'">
@@ -95,7 +95,6 @@
 							<text v-if="item.businessHours" class="cabinet-hours">{{ item.businessHours }}</text>
 						</view>
 						<view class="cabinet-meta-row">
-							<u-icon name="map-fill" color="#ccc" size="12"></u-icon>
 							<text class="cabinet-address">{{ item.address || item.location || '暂无地址信息' }}</text>
 						</view>
 						<view class="cabinet-price-row">
@@ -124,7 +123,7 @@
 
 				<!-- 空状态 -->
 				<view v-if="cabinetList.length === 0" class="empty-state">
-					<u-icon name="map" color="#ccc" size="40"></u-icon>
+					<image class="empty-img" src="/static/equipment-empty.png" mode="aspectFit"></image>
 					<text class="empty-text">附近暂无可用机柜</text>
 				</view>
 			</scroll-view>
@@ -154,6 +153,7 @@
 		reportLocation,
 		resetLocationDedup
 	} from '../../services/location.js';
+import { parseDate } from '../../utils/format.js';
 	import {
 		parseDeviceQr
 	} from '../../utils/qr-parser.js';
@@ -280,7 +280,7 @@
 
 	function goToCabinetList() {
 		uni.navigateTo({
-			url: '/pages/cabinet/list'
+			url: `/pages/cabinet/list?lat=${myLocation.value.lat}&lng=${myLocation.value.lng}`,
 		});
 	}
 
@@ -323,12 +323,12 @@
 					y: 1
 				},
 				callout: {
-					content: `${available}\n可借`,
+					content: `${available}台可借`,
 					color: '#ffffff',
 					fontSize: 12,
 					borderRadius: 12,
-					borderColor: '#3370fe',
-					bgColor: '#3370fe',
+					borderColor: '#306afc',
+					bgColor: '#306afc',
 					padding: 8,
 					display: 'ALWAYS',
 					textAlign: 'center',
@@ -357,7 +357,7 @@
 				const records = res.data.records || res.data.list || res.data || [];
 				if (records.length > 0) {
 					const order = records[0];
-					const startTime = order.pickupTime ? new Date(order.pickupTime).getTime() : Date.now();
+					const startTime = order.pickupTime ? parseDate(order.pickupTime).getTime() : Date.now();
 					deviceStore.setLeaseInfo({
 						tradeNo: order.tradeNo || '',
 						deviceSn: order.deviceSn || '',
@@ -725,7 +725,8 @@
 	function onMarkerTap(e) {
 		const markerId = e.detail?.markerId || e.markerId;
 		if (!markerId || markerId === 0) return;
-		const cabinet = cabinets.value.find(c => (c.id ?? c.cabinetNo) === markerId);
+		// markerId 可能是 number/string，兼容处理
+		const cabinet = cabinets.value.find(c => String(c.id ?? c.cabinetNo) === String(markerId));
 		if (!cabinet) return;
 		const id = cabinet.id ?? cabinet.cabinetNo;
 		const lat = cabinet.latitude || cabinet.lat || 0;
@@ -1012,6 +1013,7 @@
 		background: #f5f6fa;
 		flex-shrink: 0;
 		object-fit: cover;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 	}
 
 	.cabinet-info {
@@ -1104,12 +1106,15 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		background: rgba(48, 106, 252, 0.06);
+		padding: 6px 10px;
+		border-radius: 10px;
 	}
 
 	.cabinet-count-num {
 		font-size: 22px;
 		font-weight: 900;
-		color: $textMainColor;
+		color: $primaryColor;
 		line-height: 1;
 	}
 
@@ -1120,11 +1125,18 @@
 	}
 
 	.nav-btn {
-		width: 32px;
-		height: 32px;
+		width: 36px;
+		height: 36px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		background: rgba(48, 106, 252, 0.08);
+		border-radius: 50%;
+	}
+
+	.nav-btn image {
+		width: 20px;
+		height: 20px;
 	}
 
 	.nav-btn:active {
@@ -1138,6 +1150,11 @@
 		align-items: center;
 		padding: 40px 20px;
 		gap: 8px;
+	}
+
+	.empty-img {
+		width: 100px;
+		height: 100px;
 	}
 
 	.empty-text {
