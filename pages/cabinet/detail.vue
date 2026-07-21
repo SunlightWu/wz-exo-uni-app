@@ -18,7 +18,7 @@
 						<text class="header-cabinet-no">柜机编号：{{ cabinet.cabinetNo || cabinet.id || '-' }}</text>
 					</view>
 				</view>
-				<image class="header-img" :src="cabinet.imageUrl ? BASE_URL + cabinet.imageUrl : (cabinet.image ? BASE_URL + cabinet.image : '/static/wz_logo.png')" mode="aspectFill"></image>
+				<image class="header-img" :src="cabinet.imageUrl ? BASE_URL + cabinet.imageUrl : (cabinet.image ? BASE_URL + cabinet.image : '/static/cabinet-placeholder.jpg')" mode="aspectFill"></image>
 			</view>
 
 
@@ -81,25 +81,29 @@
 				<image class="device-img" :src="BASE_URL + selectedSlot.device.imageUrl" mode="aspectFit"></image>
 				<view class="device-info-main">
 					<view class="info-row">
-						<text class="info-label">设备型号：</text>
+						<text class="info-label">设备型号</text>
 						<text class="info-value">{{ selectedSlot.device.deviceName || '轻量助行版' }}</text>
 					</view>
 					<view class="info-row">
-						<text class="info-label">设备编号：</text>
+						<text class="info-label">设备编号</text>
 						<text class="info-value">{{ selectedSlot.device.deviceSn || 'EXO-0000' }}</text>
-						<text class="info-label" style="margin-left: 16px;">状态：</text>
+					</view>
+					<view class="info-row">
+						<text class="info-label">设备状态</text>
 						<text class="info-value"
 							:style="{ color: selectedSlot.device.deviceStatus === 0 ? '#28c76f' : '#999' }">{{ selectedSlot.device.deviceStatus === 0 ? '空闲' : selectedSlot.device.deviceStatus === 1 ? '使用中' : '维护中' }}</text>
 					</view>
 					<view class="info-row">
-						<text class="info-label">电量：</text>
-						<view class="battery-bar">
-							<view class="battery-fill"
-								:style="{ width: (selectedSlot.device.batteryLevel ?? selectedSlot.device.battery ?? 80) + '%' }">
+						<text class="info-label">剩余电量</text>
+						<view class="battery-wrap">
+							<view class="battery-bar">
+								<view class="battery-fill"
+									:class="(selectedSlot.device.batteryLevel ?? selectedSlot.device.battery ?? 80) < 20 ? 'battery-low' : ''"
+									:style="{ width: (selectedSlot.device.batteryLevel ?? selectedSlot.device.battery ?? 80) + '%' }">
+								</view>
 							</view>
+							<text class="battery-text">{{ selectedSlot.device.batteryLevel ?? selectedSlot.device.battery ?? 80 }}%</text>
 						</view>
-						<text
-							class="info-value">{{ selectedSlot.device.batteryLevel ?? selectedSlot.device.battery ?? 80 }}%</text>
 					</view>
 					<view class="info-hint">
 						<u-icon name="info-circle" color="#999" size="12"></u-icon>
@@ -143,21 +147,21 @@
 				</view>
 				<view class="cost-row">
 					<text class="cost-row-label">
-						<u-icon name="clock-fill" color="#306afc" size="14"></u-icon>
+						<u-icon name="clock-fill" color="#f59e0b" size="14"></u-icon>
 						租金
 					</text>
 					<text class="cost-row-value">¥{{ feeRate }}/小时</text>
 				</view>
 				<view class="cost-row" v-if="feeCap > 0">
 					<text class="cost-row-label">
-						<u-icon name="shield-fill" color="#306afc" size="14"></u-icon>
+						<u-icon name="shield-fill" color="#8b5cf6" size="14"></u-icon>
 						每日封顶
 					</text>
 					<text class="cost-row-value">¥{{ feeCap }}</text>
 				</view>
 				<view class="cost-row" v-if="feeFreeMinutes > 0">
 					<text class="cost-row-label">
-						<u-icon name="gift-fill" color="#306afc" size="14"></u-icon>
+						<u-icon name="gift-fill" color="#07c160" size="14"></u-icon>
 						免费时长
 					</text>
 					<text class="cost-row-value cost-free">{{ feeFreeMinutes }}分钟免费</text>
@@ -168,26 +172,43 @@
 					<view class="cost-total-right">
 						<text class="cost-total-amount" v-if="actualDeposit > 0">¥{{ actualDepositText }}</text>
 						<text class="cost-total-amount cost-free" v-else>¥0（免押）</text>
-						<text class="cost-total-hint">{{ payMode === 'free' ? '信用授权' : '押金可退' }}</text>
+						<text class="cost-total-hint">{{ payMode === 'payscore' ? '信用授权' : '押金可退' }}</text>
 					</view>
 				</view>
 			</view>
 
 			<!-- 协议勾选 -->
 			<view class="agreement-bar" :style="{ marginTop: selectedSlot && selectedSlot.device ? '16px' : '24px' }">
-				<view class="agree-check" :class="{ checked: agreed }" @click="agreed = !agreed">
-					<u-icon v-if="agreed" name="checkbox-mark" color="#fff" size="12"></u-icon>
+				<view class="agree-check-wrap" @click="agreed = !agreed">
+					<view class="agree-check" :class="{ checked: agreed }">
+						<u-icon v-if="agreed" name="checkbox-mark" color="#fff" size="14"></u-icon>
+					</view>
 				</view>
-				<text class="agree-text">我已阅读并同意《租赁协议》</text>
+				<text class="agree-text">{{ payMode === 'payscore' ? '使用微信支付分免押租借，即表示同意' : '我已阅读并同意' }}《租赁协议》</text>
 				<text class="agree-link" @click="showAgreement">查看租借规则 ›</text>
 			</view>
-			<!-- 确认租借按钮 -->
+			<!-- 确认按钮区域 -->
 			<view class="confirm-section">
-				<view class="confirm-btn" :class="{ disabled: !canConfirm }" @click="onConfirm">
-					<text class="confirm-btn-text">{{ selectedSlot ? '确认租借' : '请选择仓位' }}</text>
-					<text v-if="selectedSlot" class="confirm-btn-sub">预付
-						¥{{ actualDeposit > 0 ? actualDepositText : '0（免押）' }}</text>
-				</view>
+				<!-- 支付分模式（默认） -->
+				<template v-if="payMode === 'payscore'">
+					<view class="confirm-btn payscore-btn" :class="{ disabled: !canConfirm }" @click="onConfirm">
+						<image v-if="selectedSlot" class="confirm-btn-icon" src="/static/payscore-logo.svg" mode="aspectFit"></image>
+						<text class="confirm-btn-text">{{ selectedSlot ? '微信支付分 | 550分及以上优享' : '请选择仓位' }}</text>
+					</view>
+					<view class="pay-mode-switch" @click="payMode = 'deposit'">
+						<text class="pay-mode-switch-text">支付分未通过？使用押金支付 ›</text>
+					</view>
+				</template>
+				<!-- 押金模式（降级） -->
+				<template v-else>
+					<view class="confirm-btn" :class="{ disabled: !canConfirm }" @click="onConfirm">
+						<text class="confirm-btn-text">{{ selectedSlot ? '确认租借' : '请选择仓位' }}</text>
+						<text v-if="selectedSlot" class="confirm-btn-sub">预付 ¥{{ actualDepositText }}</text>
+					</view>
+					<view class="pay-mode-switch" @click="payMode = 'payscore'">
+						<text class="pay-mode-switch-text">免押金租借 使用微信支付分 ›</text>
+					</view>
+				</template>
 			</view>
 
 			<view style="height: calc(20px + env(safe-area-inset-bottom));"></view>
@@ -214,7 +235,7 @@
 	const distance = ref('');
 	const selectedSlot = ref(null);
 	const agreed = ref(false);
-	const payMode = ref('deposit'); // 'deposit' | 'free'
+	const payMode = ref('payscore'); // 'payscore' | 'deposit'
 
 	let cabinetId = '';
 
@@ -250,6 +271,11 @@
 			const detailRes = await api.getCabinetDetail(id);
 			if ((detailRes.code === 0 || detailRes.code === 200) && detailRes.data) {
 				cabinet.value = detailRes.data;
+			// 默认选中第一个可用设备
+			const firstAvailable = slotList.value.find(s => s.status === 'available');
+			if (firstAvailable && !selectedSlot.value) {
+				selectedSlot.value = firstAvailable;
+			}
 			}
 		} catch (err) {
 			console.error('[CabinetDetail] 加载失败:', err.message || err);
@@ -402,7 +428,7 @@
 				pickupCabinetId: cabinet.value.id,
 				feeTemplateId: d.feeTemplateId || feeTemplate.id || 1,
 				payType: 1,
-				payScene: payMode.value === 'deposit' ? 'DEPOSIT_PAY' : 'AUTH_FREEZE',
+				payScene: payMode.value === 'payscore' ? 'RISK_AUTH' : 'DEPOSIT_PAY',
 			});
 			if (!(confirmRes.code === 200 || confirmRes.code === 0) || !confirmRes.data) {
 				uni.showToast({
@@ -480,7 +506,7 @@
 				// #endif
 				console.log('[Pay] requestPayment result:', wxPayRes);
 				if (!wxPayRes.success) {
-					const errMsg = wxPayRes.error?.errMsg || wxPayRes.error?.message || '支付失败';
+					const errMsg = '支付失败';
 					uni.showToast({
 						title: errMsg,
 						icon: 'none',
@@ -537,18 +563,77 @@
 
 				// 7. 押金确认取件
 				await continueAfterPaySuccess(tradeNo, d, feeTemplate, dev);
-			} else {
-				// 免押模式：直接确认，无需支付
-				uni.showLoading({
-					title: '正在确认...',
-					mask: true
+			} else if (payMode.value === 'payscore') {
+				// 微信支付分免押模式
+				uni.showLoading({ title: '正在发起免押授权...', mask: true });
+				const openId = uni.getStorageSync('openId') || '';
+				const depositAmount = Number((depositMoney / 100).toFixed(2)) || Number(feeDeposit.value) || 500;
+				const riskRes = await api.createPreAuthRisk({
+					tradeNo,
+					amount: depositAmount,
+					openId,
+					description: '外骨骼租赁押金',
 				});
+				console.log('[PayScore] createPreAuthRisk:', riskRes);
+				if (!(riskRes.code === 200 || riskRes.code === 0) || !riskRes.data) {
+					uni.showToast({ title: riskRes.msg || '免押授权发起失败', icon: 'none' });
+					return;
+				}
+				const riskData = riskRes.data;
+				const riskPayNo = riskData.payNo || '';
+
+				// 拉起微信支付分确认页
+				uni.hideLoading();
+				const wxBizRes = await new Promise((resolve) => {
+					wx.openBusinessView({
+						businessType: 'wxpayScoreUse',
+						extraData: { package: riskData.packAge || riskData.package || '' },
+						success: (res) => resolve({ success: true, data: res }),
+						fail: (err) => resolve({ success: false, error: err }),
+					});
+				});
+				console.log('[PayScore] openBusinessView result:', wxBizRes);
+
+				if (!wxBizRes.success) {
+					uni.showToast({ title: '授权已取消，可使用押金租借', icon: 'none', duration: 2500 });
+					payMode.value = 'deposit';
+					return;
+				}
+
+				// 轮询查询免押确认结果（最多6次，间隔1.5s）
+				uni.showLoading({ title: '正在确认授权...', mask: true });
+				let authConfirmed = false;
+				for (let i = 0; i < 6; i++) {
+					await new Promise(r => setTimeout(r, 1500));
+					const confirmRes = await api.confirmRiskAuth(riskPayNo);
+					console.log(`[PayScore] confirmRiskAuth attempt ${i + 1}:`, confirmRes);
+					if ((confirmRes.code === 200 || confirmRes.code === 0) && confirmRes.data === 1) {
+						authConfirmed = true;
+						break;
+					}
+				}
+
+				if (!authConfirmed) {
+					uni.hideLoading();
+					uni.showModal({
+						title: '授权确认中',
+						content: '暂未确认授权结果，请稍后在订单列表中继续操作，或使用押金租借。',
+						confirmText: '使用押金租借',
+						cancelText: '我知道了',
+						success: (modalRes) => {
+							if (modalRes.confirm) {
+								payMode.value = 'deposit';
+							}
+						},
+					});
+					return;
+				}
+
+				// 授权成功，确认取件
+				uni.showLoading({ title: '正在确认...', mask: true });
 				const confirmPayRes = await api.depositConfirm(tradeNo);
 				if (!(confirmPayRes.code === 200 || confirmPayRes.code === 0)) {
-					uni.showToast({
-						title: confirmPayRes.msg || '确认失败',
-						icon: 'none'
-					});
+					uni.showToast({ title: confirmPayRes.msg || '确认失败', icon: 'none' });
 					return;
 				}
 			}
@@ -622,7 +707,7 @@
 	});
 
 	const actualDeposit = computed(() => {
-		return payMode.value === 'free' ? 0 : Number(feeDeposit.value);
+		return payMode.value === 'payscore' ? 0 : Number(feeDeposit.value);
 	});
 
 	const actualDepositText = computed(() => {
@@ -656,7 +741,7 @@
 	/* 顶部信息卡片 */
 	.header-card {
 		background: #fff;
-		margin: 0 16px 0;
+		margin: 12px 16px 0;
 		border-radius: 16px;
 		padding: 16px;
 		display: flex;
@@ -832,7 +917,10 @@
 
 	.slot-item.slot-selected {
 		border-color: #306afc;
-		background: rgba(48, 106, 252, 0.06);
+		background: rgba(48, 106, 252, 0.08);
+		box-shadow: 0 0 0 3px rgba(48, 106, 252, 0.12);
+		transform: scale(1.04);
+		z-index: 1;
 	}
 
 	.slot-item.slot-rented,
@@ -1017,26 +1105,33 @@
 	.info-row {
 		display: flex;
 		align-items: center;
-		flex-wrap: wrap;
-		gap: 2px;
+		justify-content: space-between;
+		gap: 8px;
 	}
 
 	.info-label {
 		font-size: 12px;
 		color: #999;
+		flex-shrink: 0;
 	}
 
 	.info-value {
-		font-size: 12px;
+		font-size: 13px;
 		font-weight: 700;
 		color: #333;
 	}
 
+	.battery-wrap {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
 	.battery-bar {
-		width: 40px;
-		height: 10px;
+		width: 60px;
+		height: 14px;
 		background: #e5e7eb;
-		border-radius: 5px;
+		border-radius: 7px;
 		overflow: hidden;
 		position: relative;
 	}
@@ -1044,8 +1139,18 @@
 	.battery-fill {
 		height: 100%;
 		background: #22c55e;
-		border-radius: 5px;
+		border-radius: 7px;
 		transition: width 0.3s;
+	}
+
+	.battery-fill.battery-low {
+		background: #ef4444;
+	}
+
+	.battery-text {
+		font-size: 12px;
+		font-weight: 700;
+		color: #333;
 	}
 
 	.info-hint {
@@ -1065,9 +1170,15 @@
 		padding: 0 4px;
 	}
 
+	.agree-check-wrap {
+		padding: 6px;
+		margin: -6px;
+		flex-shrink: 0;
+	}
+
 	.agree-check {
-		width: 16px;
-		height: 16px;
+		width: 20px;
+		height: 20px;
 		border-radius: 50%;
 		border: 2px solid #ccc;
 		display: flex;
@@ -1115,9 +1226,45 @@
 		transition: opacity 0.2s;
 	}
 
+	.confirm-btn.payscore-btn {
+		flex-direction: row;
+		gap: 6px;
+	}
+
 	.confirm-btn.disabled {
 		background: #d1d5db;
 		color: #fff;
+	}
+
+	.confirm-btn.payscore-btn {
+		background: linear-gradient(135deg, #07c160, #06ad56);
+		box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
+	}
+
+	.confirm-btn.payscore-btn.disabled {
+		background: #d1d5db;
+		box-shadow: none;
+	}
+
+	.confirm-btn-icon {
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+		margin-right: 6px;
+	}
+
+	.pay-mode-switch {
+		text-align: center;
+		margin-top: 10px;
+	}
+
+	.pay-mode-switch-text {
+		font-size: 12px;
+		color: #999;
+	}
+
+	.pay-mode-switch-text:active {
+		color: #306afc;
 	}
 
 	.confirm-btn:active:not(.disabled) {

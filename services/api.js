@@ -48,6 +48,8 @@ function clearTokens() {
 // ── 刷新 token ──
 let isRefreshing = false;
 let refreshQueue = [];
+let refreshRetryCount = 0;
+const MAX_REFRESH_RETRY = 1;
 
 async function doRefreshToken() {
   const refreshToken = getRefreshToken();
@@ -79,13 +81,32 @@ async function doRefreshToken() {
       setTokens(res.data.token, res.data.refreshToken);
       refreshQueue.forEach(q => q.resolve(res.data.token));
       refreshQueue = [];
+      refreshRetryCount = 0;
       return res.data.token;
     }
     throw new Error(res.msg || '刷新失败');
   } catch (e) {
+    // 刷新失败：尝试自动重新静默登录（最多 1 次）
+    if (refreshRetryCount < MAX_REFRESH_RETRY) {
+      refreshRetryCount++;
+      try {
+        const { wxLogin } = await import('./auth.js');
+        const loginResult = await wxLogin();
+        if (loginResult.success) {
+          setTokens(loginResult.data.token, loginResult.data.refreshToken);
+          refreshQueue.forEach(q => q.resolve(loginResult.data.token));
+          refreshQueue = [];
+          refreshRetryCount = 0;
+          return loginResult.data.token;
+        }
+      } catch (reLoginErr) {
+        console.error('[Refresh] 自动重登录失败:', reLoginErr.message);
+      }
+    }
     refreshQueue.forEach(q => q.reject(e));
     refreshQueue = [];
     clearTokens();
+    refreshRetryCount = 0;
     throw e;
   } finally {
     isRefreshing = false;
@@ -177,6 +198,9 @@ export const api = {
   paymentConfirm: (payNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/confirm?payNo=${payNo}`),
   getPaymentStatus: (payNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/payment/${payNo}`),
   getWechatStatus: (payNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/payment/wechat-status/${payNo}`),
+  // 支付分免押订单
+  createPreAuthRisk: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/pre-auth-risk`, data),
+  confirmRiskAuth: (payNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/risk-auth/confirm?payNo=${payNo}`),
 
   // ── 网点 ──
   getNearbyPlaces: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/places/nearby`, null, { params }),

@@ -11,13 +11,20 @@
 
 		<!-- 费用概览 -->
 		<view class="cost-overview">
+			<view v-if="orderData.payScene === 'RISK_AUTH'" class="cost-payscore-badge">
+				<image class="payscore-badge-icon" src="/static/payscore-logo.svg" mode="aspectFit"></image>
+				<text class="payscore-badge-text">微信支付分免押</text>
+			</view>
 			<view class="cost-main">
 				<text class="cost-label">{{ orderData.status === 3 ? '实付租金' : '应付金额' }}</text>
 				<text class="cost-amount">¥{{ ((orderData.payMoney || orderData.incomeMoney || 0) / 100).toFixed(2) }}</text>
 			</view>
-			<view v-if="orderData.depositMoney > 0" class="cost-deposit">
+			<view v-if="orderData.payScene !== 'RISK_AUTH' && orderData.depositMoney > 0" class="cost-deposit">
 				<text>押金 ¥{{ (orderData.depositMoney / 100).toFixed(2) }}</text>
-				<text v-if="orderData.depositRefund > 0" class="cost-refund">退还 ¥{{ orderData.depositRefund.toFixed(2) }}</text>
+				<text v-if="orderData.status === 3" class="cost-refund">已退还</text>
+			</view>
+			<view v-else-if="orderData.payScene === 'RISK_AUTH'" class="cost-deposit">
+				<text>信用授权 · 用后扣款</text>
 			</view>
 		</view>
 
@@ -71,7 +78,7 @@
 				<u-icon name="rmb-circle-fill" color="#306afc" size="16"></u-icon>
 				<text class="card-title">费用明细</text>
 			</view>
-			<view class="info-row">
+			<view class="info-row" v-if="orderData.payScene !== 'RISK_AUTH'">
 				<text class="info-label">押金</text>
 				<text class="info-value">¥{{ (orderData.depositMoney / 100).toFixed(2) }}</text>
 			</view>
@@ -594,6 +601,28 @@ function goHome() {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	color: #fff;
+}
+
+.cost-payscore-badge {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	background: rgba(255, 255, 255, 0.2);
+	padding: 4px 12px;
+	border-radius: 20px;
+	margin-bottom: 10px;
+}
+
+.payscore-badge-icon {
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+}
+
+.payscore-badge-text {
+	font-size: 12px;
+	font-weight: 600;
 	color: #fff;
 }
 

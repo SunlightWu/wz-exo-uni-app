@@ -108,8 +108,10 @@ const polylines = computed(() => {
 		points: pts.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
 		color: '#306afc',
 		width: 4,
-		arrowLine: false,
-		dottedLine: false
+		arrowLine: true,
+		dottedLine: false,
+		borderColor: 'rgba(48,106,252,0.15)',
+		borderWidth: 2
 	}];
 });
 
@@ -118,16 +120,16 @@ const markers = computed(() => {
 	const pts = validPoints.value;
 	if (pts.length === 0) return [];
 	const ms = [];
-	// 起点
+	// 起点：空心圆点
 	ms.push({
 		id: 1,
 		latitude: pts[0].latitude,
 		longitude: pts[0].longitude,
 		title: '起点',
-		iconPath: '/static/marker-start.png',
-		width: 28,
-		height: 36,
-		anchor: { x: 0.5, y: 1 }
+		iconPath: '/static/marker-start.svg',
+		width: 32,
+		height: 32,
+		anchor: { x: 0.5, y: 0.5 }
 	});
 	// 终点（如果超过1个点）
 	if (pts.length > 1) {
@@ -137,10 +139,10 @@ const markers = computed(() => {
 			latitude: last.latitude,
 			longitude: last.longitude,
 			title: '终点',
-			iconPath: '/static/marker-end.png',
-			width: 28,
-			height: 36,
-			anchor: { x: 0.5, y: 1 }
+			iconPath: '/static/marker-end.svg',
+			width: 32,
+			height: 32,
+			anchor: { x: 0.5, y: 0.5 }
 		});
 	}
 	return ms;

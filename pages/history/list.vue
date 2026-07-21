@@ -54,16 +54,33 @@
 							<text class="body-label">归还</text>
 							<text class="body-value">{{ formatDateTime(item.returnTime) }}</text>
 						</view>
-						<view class="body-row">
+						<view class="body-row" v-if="item.payScene !== 'RISK_AUTH'">
 							<text class="body-label">押金</text>
 							<text class="body-value">¥{{ (item.depositMoney / 100).toFixed(2) }}</text>
+						</view>
+						<view v-else class="body-row">
+							<text class="body-label">模式</text>
+							<text class="body-value payscore-tag">支付分免押</text>
 						</view>
 					</view>
 
 					<!-- 底部：编号 + 箭头 -->
 					<view class="card-footer">
 						<text class="trade-no">订单 {{ item.tradeNo }}</text>
-						<u-icon name="arrow-right" color="#ccc" size="16"></u-icon>
+						<u-icon v-if="(item.status ?? item.state) !== 0" name="arrow-right" color="#ccc" size="16"></u-icon>
+					</view>
+					<!-- 待付押金状态操作按钮 -->
+					<view v-if="(item.status ?? item.state) === 0" class="card-actions">
+						<view class="action-btn action-cancel" @click.stop="onCancelOrder(item)">
+							<text>取消订单</text>
+						</view>
+						<view v-if="item.payScene === 'RISK_AUTH'" class="action-btn action-payscore" @click.stop="onContinueOrder(item)">
+							<image class="action-payscore-icon" src="/static/payscore-logo.svg" mode="aspectFit"></image>
+							<text>微信支付分免押租借</text>
+						</view>
+						<view v-else class="action-btn action-continue" @click.stop="onContinueOrder(item)">
+							<text>付押金继续</text>
+						</view>
 					</view>
 				</view>
 			</view>
@@ -395,6 +412,12 @@ function goToIndex() {
 	text-align: right;
 }
 
+.payscore-tag {
+	color: #07c160;
+	font-size: 12px;
+	font-weight: 700;
+}
+
 /* 底部 */
 .card-footer {
 	display: flex;
@@ -457,5 +480,11 @@ function goToIndex() {
 	font-size: 15px;
 	font-weight: 700;
 	color: #fff;
+}
+
+.action-payscore-icon {
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
 }
 </style>

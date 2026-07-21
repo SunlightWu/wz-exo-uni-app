@@ -113,9 +113,13 @@
 				<u-icon name="rmb-circle-fill" color="#306afc" size="16"></u-icon>
 				<text class="card-title">费用明细</text>
 			</view>
-			<view class="info-row">
+			<view class="info-row" v-if="order.payScene !== 'RISK_AUTH'">
 				<text class="info-label">押金</text>
 				<text class="info-value">¥{{ (order.depositMoney / 100).toFixed(2) }}</text>
+			</view>
+			<view v-else class="info-row">
+				<text class="info-label">模式</text>
+				<text class="info-value payscore-tag">支付分免押</text>
 			</view>
 			<view class="info-row" v-if="order.riskAmount > 0">
 				<text class="info-label">风险冻结</text>
@@ -397,6 +401,11 @@ async function loadOrderDetail(tradeNo) {
 	max-width: 60%;
 	text-align: right;
 	word-break: break-all;
+}
+
+.payscore-tag {
+	color: #07c160;
+	font-weight: 700;
 }
 
 .info-value.mono {

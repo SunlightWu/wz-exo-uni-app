@@ -27,6 +27,15 @@
 					</view>
 					<view class="user-meta">
 						<text class="nickname-text">{{ userInfo.nickname || '微信用户' }}</text>
+						<button v-if="!phoneBound" class="phone-login-btn" open-type="getPhoneNumber" @getphonenumber="onGetPhoneNumber">
+							<u-icon name="phone-fill" color="#fff" size="12"></u-icon>
+							<text>手机号登录</text>
+							<u-icon name="arrow-right" color="rgba(255,255,255,0.6)" size="10"></u-icon>
+						</button>
+						<text v-else class="phone-bound-text">
+							<u-icon name="phone-fill" color="rgba(255,255,255,0.7)" size="10"></u-icon>
+							{{ phoneNumber || '已绑定手机号' }}
+						</text>
 					</view>
 				</view>
 			</view>
@@ -194,17 +203,20 @@
 		onMounted
 	} from 'vue';
 	import {
-		getUserInfo
-	} from '../../services/auth.js';
+		useUserStore
+	} from '../../store/user.js';
 	import {
 		api
 	} from '../../services/api.js';
 
+	const userStore = useUserStore();
 	const statusBarHeight = ref(20)
 	const userInfo = ref({
 		nickname: '微信用户',
 		avatar: ''
 	})
+	const phoneBound = ref(false)
+	const phoneNumber = ref('')
 	// 资料编辑面板
 	const showEditPanel = ref(false)
 	const editNickname = ref('')
@@ -220,24 +232,29 @@
 		const sys = await uni.getSystemInfo()
 		statusBarHeight.value = sys.statusBarHeight || 20
 
-		// 检查登录态
-		const token = uni.getStorageSync('token')
+		// 从 store 恢复状态
+		userStore.restoreFromStorage()
 
-		// 尝试获取本地缓存的微信用户信息
-		const wxUser = uni.getStorageSync('wxUserInfo')
-		if (wxUser) {
-			userInfo.value.avatar = wxUser.avatarUrl || ''
-			userInfo.value.nickname = wxUser.nickName || '微信用户'
-		}
+		// 同步本地用户信息到页面
+		userInfo.value.nickname = userStore.userInfo.nickname
+		userInfo.value.avatar = userStore.userInfo.avatar
+		phoneBound.value = userStore.phoneBound
+		phoneNumber.value = userStore.phoneNumber
 
-		// 微信静默登录：无 token 时自动登录
-		if (!token) {
-			await doWxLogin()
+		// 静默登录：无 token 时自动登录
+		if (!userStore.token) {
+			await userStore.login()
+			userInfo.value.nickname = userStore.userInfo.nickname
+			userInfo.value.avatar = userStore.userInfo.avatar
 		}
 
 		// 已登录时从后端拉取最新用户信息
-		if (uni.getStorageSync('token')) {
-			await fetchMemberInfo()
+		if (userStore.token) {
+			await userStore.fetchMemberInfo()
+			userInfo.value.nickname = userStore.userInfo.nickname
+			userInfo.value.avatar = userStore.userInfo.avatar
+			phoneBound.value = userStore.phoneBound
+			phoneNumber.value = userStore.phoneNumber
 		}
 
 		// 加载统计数据
@@ -250,72 +267,35 @@
 		loadCoupons()
 	})
 
-	// ── 微信静默登录 ──
-	// 调用真实后端：POST http://192.168.108.183:8080/member/xcx/login
-	// 请求体：{ code, avatarUrl?, nickName? }
-	async function doWxLogin() {
-		try {
-			const loginRes = await new Promise((resolve, reject) => {
-				uni.login({ provider: 'weixin', success: resolve, fail: reject })
-			})
-
-			// 组装请求体：如有本地缓存的用户信息一并带上
-			const wxUser = uni.getStorageSync('wxUserInfo') || {}
-			const payload = {
-				code: loginRes.code,
-				avatarUrl: wxUser.avatarUrl || '',
-				nickName: wxUser.nickName || '',
-			}
-
-			const result = await api.wxXcxLogin(payload)
-			if (result.code === 200 && result.data) {
-				const d = result.data
-				// 保存双 token
-				uni.setStorageSync('token', d.token)
-				if (d.refreshToken) {
-					uni.setStorageSync('refreshToken', d.refreshToken)
-				}
-				// 保存会员ID
-				if (d.memberId) {
-					uni.setStorageSync('memberId', String(d.memberId))
-				}
-				// 保存 openId
-				if (d.openId) {
-					uni.setStorageSync('openId', d.openId)
-				}
-				// 后端返回用户信息则更新本地（兼容 null）
-				if (d.nickname || d.avatar) {
-					userInfo.value.nickname = d.nickname || userInfo.value.nickname
-					userInfo.value.avatar = d.avatar || userInfo.value.avatar
-					uni.setStorageSync('wxUserInfo', {
-						nickName: d.nickname || '',
-						avatarUrl: d.avatar || '',
-					})
-				}
-			} else {
-				console.error('[WxLogin] 后端返回错误:', result.msg || '未知错误')
-			}
-		} catch (err) {
-			console.error('[WxLogin] 静默登录失败:', err.message || err)
+	// ── 手机号授权登录 ──
+	async function onGetPhoneNumber(e) {
+		const detail = e.detail
+		if (!detail || detail.errMsg !== 'getPhoneNumber:ok') {
+			uni.showToast({ title: '需要手机号才能使用完整功能', icon: 'none', duration: 2000 })
+			return
 		}
-	}
+		if (!detail.code) {
+			uni.showToast({ title: '获取手机号失败', icon: 'none' })
+			return
+		}
 
-	// ── 从后端拉取会员信息 ──
-	async function fetchMemberInfo() {
+		uni.showLoading({ title: '手机号登录中...', mask: true })
 		try {
-			const result = await api.getMemberInfo()
-			if (result.code === 200 && result.data) {
-				const d = result.data
-				userInfo.value.nickname = d.nickname || userInfo.value.nickname
-				userInfo.value.avatar = d.avatar || userInfo.value.avatar
-				// 同步保存到本地
-				uni.setStorageSync('wxUserInfo', {
-					nickName: d.nickname || '',
-					avatarUrl: d.avatar || '',
-				})
+			const success = await userStore.phoneLogin(detail.code)
+			if (success) {
+				phoneBound.value = true
+				phoneNumber.value = userStore.phoneNumber
+				userInfo.value.nickname = userStore.userInfo.nickname
+				userInfo.value.avatar = userStore.userInfo.avatar
+				uni.showToast({ title: '手机号登录成功', icon: 'success' })
+			} else {
+				uni.showToast({ title: '手机号绑定失败', icon: 'none' })
 			}
 		} catch (err) {
-			console.error('[Member] 获取会员信息失败:', err.message || err)
+			console.error('[PhoneLogin] 手机号登录异常:', err.message || err)
+			uni.showToast({ title: '网络异常，请重试', icon: 'none' })
+		} finally {
+			uni.hideLoading()
 		}
 	}
 
@@ -597,6 +577,40 @@
 		font-size: 18px;
 		font-weight: 700;
 		color: #fff;
+	}
+
+	.phone-login-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		background: rgba(255, 255, 255, 0.2);
+		border: none;
+		border-radius: 20px;
+		padding: 4px 12px;
+		margin-top: 4px;
+		font-size: 12px;
+		font-weight: 600;
+		color: #fff;
+		line-height: 1.4;
+		height: auto;
+		min-height: 0;
+	}
+
+	.phone-login-btn::after {
+		border: none;
+	}
+
+	.phone-login-btn:active {
+		background: rgba(255, 255, 255, 0.3);
+	}
+
+	.phone-bound-text {
+		font-size: 12px;
+		color: rgba(255, 255, 255, 0.7);
+		margin-top: 4px;
+		display: flex;
+		align-items: center;
+		gap: 4px;
 	}
 
 	/* ===== 白色内容卡片 ===== */

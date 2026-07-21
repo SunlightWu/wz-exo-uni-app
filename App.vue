@@ -1,13 +1,46 @@
 <script>
 	import { api } from './services/api.js';
 
+	// 免登录白名单页面路径
+	const NO_LOGIN_PAGES = [
+		'pages/index/index',
+		'pages/profile/my',
+		'pages/profile/about',
+		'pages/profile/agreement',
+		'pages/agreement/lease',
+		'pages/cabinet/list',
+		'pages/cabinet/detail',
+	];
+
 	export default {
 		onLaunch: function() {
 			console.log('App Launch')
-			const token = uni.getStorageSync('token')
-			if (!token) {
-				console.log('未登录，需要登录')
-			}
+
+			// 全局路由守卫：拦截 navigateTo / switchTab / redirectTo
+			['navigateTo', 'switchTab', 'redirectTo', 'reLaunch'].forEach(type => {
+				uni.addInterceptor(type, {
+					invoke(e) {
+						const url = e.url || '';
+						// 提取页面路径（去掉参数）
+						const path = url.split('?')[0].replace(/^\//, '');
+						// 检查是否在白名单中
+						const isPublic = NO_LOGIN_PAGES.some(p => path === p || path.startsWith(p));
+						if (isPublic) return; // 白名单放行
+
+						// 检查登录态
+						const token = uni.getStorageSync('token');
+						if (!token) {
+							// 跳转到首页，并提示
+							uni.showToast({ title: '请先登录', icon: 'none', duration: 1500 });
+							// 阻止原跳转，重定向到首页
+							const tabBarPages = ['pages/index/index', 'pages/history/list', 'pages/profile/my'];
+							if (tabBarPages.includes(path)) return; // tabBar 页面放行
+							// 修改跳转目标
+							e.url = '/pages/index/index';
+						}
+					},
+				});
+			});
 		},
 		onShow: function() {
 			console.log('App Show')

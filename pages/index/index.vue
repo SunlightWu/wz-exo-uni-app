@@ -146,6 +146,9 @@
 		useDeviceStore
 	} from '../../store/device.js';
 	import {
+		useUserStore
+	} from '../../store/user.js';
+	import {
 		api,
 		BASE_URL
 	} from '../../services/api.js';
@@ -163,6 +166,7 @@ import { parseDate } from '../../utils/format.js';
 	import BottomDrawer from '../../components/BottomDrawer.vue';
 
 	const deviceStore = useDeviceStore();
+	const userStore = useUserStore();
 
 	const statusBarHeight = ref(20)
 	const locating = ref(false)
@@ -346,69 +350,67 @@ import { parseDate } from '../../utils/format.js';
 	// 定位上报定时器
 	let locationTimer = null;
 
-	async function checkActiveLease() {
+	// ── 通用订单查询 ──
+	async function checkLeaseOrders(status, onFound) {
 		try {
 			const res = await api.getMyOrders({
-				status: 1,
+				status,
 				pageNum: 1,
 				pageSize: 1
 			});
 			if ((res.code === 200 || res.code === 0) && res.data) {
-				const records = res.data.records || res.data.list || res.data || [];
+				const records = res.data.records || res.data.list || [];
 				if (records.length > 0) {
-					const order = records[0];
-					const startTime = order.pickupTime ? parseDate(order.pickupTime).getTime() : Date.now();
-					deviceStore.setLeaseInfo({
-						tradeNo: order.tradeNo || '',
-						deviceSn: order.deviceSn || '',
-						startTime,
-						rate: order.hourlyRate || 0,
-						freeMinutes: order.freeMinutes || 0,
-						deposit: order.depositMoney || 0,
-						deviceName: order.deviceName || '外骨骼设备',
-					});
-					console.log('[Index] 恢复进行中的订单:', order.tradeNo);
+					onFound && onFound(records[0]);
 					return true;
 				}
 			}
 		} catch (e) {
-			console.warn('[Index] 查询进行中的订单失败:', e.message);
+			console.warn(`[Index] 查询订单(status=${status})失败:`, e.message);
 		}
-		// API 无数据时回退到本地 storage
-		deviceStore.restoreLeaseInfo();
-		return deviceStore.leaseRunning;
-	}
-
-	async function checkPendingPayment() {
-		try {
-			const res = await api.getMyOrders({
-				status: 2,
-				pageNum: 1,
-				pageSize: 1
-			});
-			if ((res.code === 200 || res.code === 0) && res.data) {
-				const records = res.data.records || res.data.list || res.data || [];
-				if (records.length > 0) {
-					pendingOrder.value = records[0];
-					console.log('[Index] 发现待支付订单:', pendingOrder.value.tradeNo);
-					return true;
-				}
-			}
-		} catch (e) {
-			console.warn('[Index] 查询待支付订单失败:', e.message);
-		}
-		pendingOrder.value = null;
 		return false;
 	}
 
-	async function startLeaseServices() {
-		// 启动悬浮卡片定时刷新
-		if (!leaseTimer) {
-			updateLeaseFloat();
-			leaseTimer = setInterval(updateLeaseFloat, 1000);
+	async function checkActiveLease() {
+		const found = await checkLeaseOrders(1, (order) => {
+			const startTime = order.pickupTime ? parseDate(order.pickupTime).getTime() : Date.now();
+			deviceStore.setLeaseInfo({
+				tradeNo: order.tradeNo || '',
+				deviceSn: order.deviceSn || '',
+				startTime,
+				rate: order.hourlyRate || 0,
+				freeMinutes: order.freeMinutes || 0,
+				deposit: order.depositMoney || 0,
+				deviceName: order.deviceName || '外骨骼设备',
+			});
+			console.log('[Index] 恢复进行中的订单:', order.tradeNo);
+		});
+		if (!found) {
+			// API 无进行中订单时，清除可能过期的本地状态
+			deviceStore.endLease();
 		}
+		return found || deviceStore.leaseRunning;
+	}
+
+	async function checkPendingPayment() {
+		const found = await checkLeaseOrders(2, (order) => {
+			pendingOrder.value = order;
+			console.log('[Index] 发现待支付订单:', order.tradeNo);
+		});
+		if (!found) {
+			pendingOrder.value = null;
+		}
+		return found;
+	}
+
+	async function startLeaseServices() {
+		// 安全启动：先停止旧 timer 避免重复
+		stopLeaseServices();
+		// 启动悬浮卡片定时刷新
+		updateLeaseFloat();
+		leaseTimer = setInterval(updateLeaseFloat, 1000);
 		// 启动定位上报（每 5 秒一次，内部自动去重）
-		if (!locationTimer && deviceStore.leaseDeviceSn) {
+		if (deviceStore.leaseDeviceSn) {
 			locationTimer = setInterval(() => {
 				reportLocation(deviceStore.leaseDeviceSn);
 			}, 5000);
@@ -429,41 +431,44 @@ import { parseDate } from '../../utils/format.js';
 	onMounted(async () => {
 		const sys = await uni.getSystemInfo()
 		statusBarHeight.value = sys.statusBarHeight || 20
-		// 查询进行中的订单，恢复租赁状态
-		const hasActiveLease = await checkActiveLease();
+
+		// 并行：静默登录 + 检查进行中订单 + 检查待支付订单
+		// 登录依赖用户状态，订单查询需要网络，可以并行减少等待
+		const [loginDone, hasActiveLease, hasPendingPayment] = await Promise.all([
+			(async () => {
+				if (!userStore.token) {
+					await userStore.login()
+				}
+				if (userStore.token) {
+					userStore.fetchMemberInfo()
+				}
+				return true
+			})(),
+			checkActiveLease(),
+			checkPendingPayment(),
+		]);
+
 		if (hasActiveLease) {
 			await startLeaseServices();
 		}
-		// 查询待支付订单
-		await checkPendingPayment();
-		// 延迟创建 mapContext 并定位，确保 map 完全渲染
+
+		// 延迟创建 mapContext 并定位（不阻塞页面初始渲染）
 		setTimeout(() => {
 			mapContext = uni.createMapContext('mapEl', null);
 			getLocation();
 		}, 400);
-
-		// 首页静默登录：无 token 时自动登录
-		const token = uni.getStorageSync('token')
-		if (!token) {
-			await doSilentLogin()
-		}
 	});
 
 	let isFirstShow = true;
 
 	onShow(async () => {
-		// 首次 onShow 与 onMounted 同时触发，跳过避免重复请求
+		// 首次 onShow 在 onMounted 之后触发，不重复查询订单
+		// 仅需确保 timer 已启动（onMounted 到 onShow 间隔可能很短）
 		if (isFirstShow) {
 			isFirstShow = false;
-			// 仅检查租赁状态
-			if (!deviceStore.leaseRunning) {
-				const hasActiveLease = await checkActiveLease();
-				if (hasActiveLease) await startLeaseServices();
-			} else if (!leaseTimer) {
+			if (deviceStore.leaseRunning && !leaseTimer) {
 				await startLeaseServices();
 			}
-			// 检查待支付订单
-			await checkPendingPayment();
 			return;
 		}
 		// 非首次显示：刷新柜机列表
@@ -472,7 +477,7 @@ import { parseDate } from '../../utils/format.js';
 		} else {
 			getLocation();
 		}
-		// 检查租赁状态（处理从其他页面返回）
+		// 从其他页面返回时，重新检查订单状态（可能有变化）
 		if (!deviceStore.leaseRunning) {
 			const hasActiveLease = await checkActiveLease();
 			if (hasActiveLease) {
@@ -481,7 +486,6 @@ import { parseDate } from '../../utils/format.js';
 		} else if (!leaseTimer) {
 			await startLeaseServices();
 		}
-		// 检查待支付订单（处理从结算页返回）
 		await checkPendingPayment();
 	});
 
@@ -763,36 +767,6 @@ import { parseDate } from '../../utils/format.js';
 		});
 	}
 
-	// ── 首页静默登录 ──
-	async function doSilentLogin() {
-		try {
-			const loginRes = await new Promise((resolve, reject) => {
-				uni.login({
-					provider: 'weixin',
-					success: resolve,
-					fail: reject
-				})
-			})
-			const result = await api.wxXcxLogin({
-				code: loginRes.code
-			})
-			if (result.code === 200 && result.data) {
-				uni.setStorageSync('token', result.data.token)
-				if (result.data.refreshToken) {
-					uni.setStorageSync('refreshToken', result.data.refreshToken)
-				}
-				if (result.data.memberId) {
-					uni.setStorageSync('memberId', String(result.data.memberId))
-				}
-				if (result.data.openId) {
-					uni.setStorageSync('openId', result.data.openId)
-				}
-				console.log('[Index] 静默登录成功')
-			}
-		} catch (err) {
-			console.error('[Index] 静默登录失败:', err.message || err)
-		}
-	}
 
 	function showUsage() {
 		uni.showModal({
