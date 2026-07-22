@@ -1,8 +1,15 @@
 <template>
 	<view class="cabinet-page">
 		<!-- 柜机列表 -->
-		<scroll-view scroll-y class="cabinet-list" @scrolltolower="loadMore" refresher-enabled
-			:refresher-triggered="refreshing" @refresherrefresh="onRefresh">
+		<scroll-view
+			scroll-y
+			class="cabinet-list"
+			:refresher-enabled="cabinetList.length > 0"
+			:refresher-triggered="refreshing"
+			@refresherrefresh="onRefresh"
+			@scrolltolower="loadMore"
+			lower-threshold="100"
+		>
 
 			<view v-for="item in cabinetList" :key="item.id" class="cabinet-card" @tap="goToCabinetDetail(item)">
 				<!-- 左侧图片 -->
@@ -424,7 +431,8 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		padding: 60px 20px;
+		justify-content: center;
+		min-height: calc(100vh - 20px);
 		gap: 12px;
 	}
 

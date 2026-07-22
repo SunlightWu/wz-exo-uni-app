@@ -1,7 +1,7 @@
 <template>
 	<view class="order-page">
 		<!-- 顶部状态筛选 -->
-		<scroll-view class="filter-bar" scroll-x :show-scrollbar="false">
+		<view class="filter-bar">
 			<view
 				v-for="tab in filterTabs"
 				:key="tab.value"
@@ -11,18 +11,19 @@
 			>
 				<text class="filter-text">{{ tab.label }}</text>
 			</view>
-		</scroll-view>
+		</view>
 
 		<!-- 订单列表 -->
 		<scroll-view
 			class="order-scroll"
 			scroll-y
-			:refresher-enabled="true"
+			:refresher-enabled="orders.length > 0"
 			:refresher-triggered="refreshing"
 			@refresherrefresh="onPullRefresh"
 			@scrolltolower="onLoadMore"
+			lower-threshold="100"
 		>
-			<view class="order-list">
+			<view v-if="orders.length > 0" class="order-list">
 				<view
 					v-for="item in orders"
 					:key="item.tradeNo"
@@ -86,7 +87,7 @@
 			</view>
 
 			<!-- 加载状态 -->
-			<view class="load-status">
+			<view v-if="orders.length > 0" class="load-status">
 				<text v-if="loadingMore" class="load-text">加载中...</text>
 				<text v-else-if="noMore" class="load-text">没有更多了</text>
 			</view>
@@ -188,6 +189,7 @@ function onPullRefresh() {
 }
 
 function onLoadMore() {
+	console.log('[OrderList] scrolltolower triggered');
 	if (loadingMore.value || noMore.value) return;
 	pageNum.value++;
 	loadOrders(true);
@@ -239,11 +241,56 @@ function goToIndex() {
 	uni.switchTab({ url: '/pages/index/index' });
 }
 
+// ── 取消订单 ──
+async function onCancelOrder(item) {
+	uni.showModal({
+		title: '确认取消订单',
+		content: '取消后需重新下单，是否继续？',
+		confirmText: '确认取消',
+		confirmColor: '#ff4d4f',
+		cancelText: '再想想',
+		success: async (res) => {
+			if (res.confirm) {
+				uni.showLoading({ title: '取消中...', mask: true });
+				try {
+					const result = await api.cancelOrder(item.tradeNo);
+					if (result.code === 200 || result.code === 0) {
+						uni.showToast({ title: '订单已取消', icon: 'success' });
+						// 刷新列表
+						loadOrders(false);
+					} else {
+						uni.showToast({ title: result.msg || '取消失败', icon: 'none' });
+					}
+				} catch (e) {
+					console.error('[Cancel] 取消订单失败:', e.message);
+					uni.showToast({ title: '网络异常，请重试', icon: 'none' });
+				} finally {
+					uni.hideLoading();
+				}
+			}
+		},
+	});
+}
+
+// ── 继续支付/授权 ──
+async function onContinueOrder(item) {
+	// 跳转到柜机详情页，进入继续支付模式
+	// 订单列表已包含 deviceSn、pickupCabinetId、payScene 等关键字段
+	const cabinetId = item.pickupCabinetId || '';
+	if (!cabinetId) {
+		uni.showToast({ title: '订单信息不完整', icon: 'none' });
+		return;
+	}
+	uni.navigateTo({
+		url: `/pages/cabinet/detail?continuePay=1&tradeNo=${item.tradeNo}&cabinetId=${cabinetId}&deviceSn=${item.deviceSn || ''}&payScene=${item.payScene || 'DEPOSIT_PAY'}`,
+	});
+}
+
 </script>
 
 <style scoped lang="scss">
 .order-page {
-	min-height: 100vh;
+	height: 100vh;
 	background: #f5f6fa;
 	display: flex;
 	flex-direction: column;
@@ -257,19 +304,20 @@ function goToIndex() {
 /* 筛选栏 */
 .filter-bar {
 	display: flex;
-	white-space: nowrap;
+	align-items: center;
+	justify-content: space-around;
 	background: #fff;
 	padding: 8px 16px;
 	border-bottom: 1px solid #f0f0f0;
-	position: sticky;
-	top: 0;
-	z-index: 10;
+	flex-shrink: 0;
 }
 
 .filter-tab {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
-	padding: 6px 14px;
+	justify-content: center;
+	flex: 1;
+	padding: 6px 0;
 	border-radius: 20px;
 	transition: all 0.2s;
 }
@@ -292,6 +340,7 @@ function goToIndex() {
 /* 列表滚动区 */
 .order-scroll {
 	flex: 1;
+	min-height: 0; /* 关键：允许 flex 子元素被压缩到 0 */
 }
 
 .order-list {
@@ -448,7 +497,8 @@ function goToIndex() {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	padding-top: 100px;
+	justify-content: center;
+	min-height: calc(100vh - 50px);
 	gap: 10px;
 }
 
@@ -486,5 +536,54 @@ function goToIndex() {
 	width: 20px;
 	height: 20px;
 	flex-shrink: 0;
+}
+
+/* 操作按钮 */
+.card-actions {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 10px;
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid #f5f6fa;
+}
+
+.action-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 8px 18px;
+	border-radius: 20px;
+	font-size: 13px;
+	font-weight: 600;
+	transition: all 0.2s;
+}
+
+.action-btn:active {
+	transform: scale(0.96);
+	opacity: 0.9;
+}
+
+/* 取消订单 */
+.action-cancel {
+	background: #fff;
+	color: #666;
+	border: 1px solid #e0e0e0;
+}
+
+/* 付押金继续 */
+.action-continue {
+	background: $primaryColor;
+	color: #fff;
+	box-shadow: 0 4px 12px rgba(48, 106, 252, 0.25);
+}
+
+/* 微信支付分免押租借 */
+.action-payscore {
+	background: linear-gradient(135deg, #07c160, #06ad56);
+	color: #fff;
+	gap: 4px;
+	box-shadow: 0 4px 12px rgba(7, 193, 96, 0.25);
 }
 </style>

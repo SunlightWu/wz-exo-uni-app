@@ -236,6 +236,8 @@
 	const selectedSlot = ref(null);
 	const agreed = ref(false);
 	const payMode = ref('payscore'); // 'payscore' | 'deposit'
+	const isContinuePay = ref(false);
+	const continueTradeNo = ref('');
 
 	let cabinetId = '';
 
@@ -243,11 +245,23 @@
 		const pages = getCurrentPages();
 		const page = pages[pages.length - 1];
 		const query = page.options || page.$route?.query || {};
-		cabinetId = query.id || '';
+		cabinetId = query.id || query.cabinetId || '';
 		const lat = parseFloat(query.lat) || 0;
 		const lng = parseFloat(query.lng) || 0;
 		const userLat = parseFloat(query.userLat) || 0;
 		const userLng = parseFloat(query.userLng) || 0;
+
+		// 继续支付模式
+		if (query.continuePay === '1' && query.tradeNo) {
+			isContinuePay.value = true;
+			continueTradeNo.value = query.tradeNo;
+			agreed.value = true;
+			if (query.payScene === 'RISK_AUTH') {
+				payMode.value = 'payscore';
+			} else {
+				payMode.value = 'deposit';
+			}
+		}
 
 		if (lat && lng && userLat && userLng) {
 			const d = haversine(userLat, userLng, lat, lng);
@@ -256,6 +270,16 @@
 
 		if (cabinetId) {
 			await loadCabinetDetail(cabinetId);
+			// 继续支付模式：加载柜机后自动选中对应设备
+			if (isContinuePay.value && query.deviceSn) {
+				const target = slotList.value.find(s => s.device?.deviceSn === query.deviceSn);
+				if (target) {
+					selectedSlot.value = target;
+				}
+			}
+		} else if (isContinuePay.value) {
+			// 继续支付模式但无 cabinetId，尝试从订单获取
+			loading.value = false;
 		} else {
 			loading.value = false;
 			uni.showToast({
@@ -355,22 +379,280 @@
 		return selectedSlot.value && selectedSlot.value.status === 'available' && agreed.value;
 	});
 
+	// ── 失败时显示取消订单选项 ──
+	async function showCancelOption(tradeNo, content) {
+		uni.showModal({
+			title: '操作失败',
+			content: content || '订单处理失败，是否取消该订单？',
+			confirmText: '取消订单',
+			confirmColor: '#ff4d4f',
+			cancelText: '再试试',
+			success: async (res) => {
+				if (res.confirm) {
+					uni.showLoading({ title: '取消中...', mask: true });
+					try {
+						const cancelRes = await api.cancelOrder(tradeNo);
+						if (cancelRes.code === 200 || cancelRes.code === 0) {
+							uni.showToast({ title: '订单已取消', icon: 'success' });
+							setTimeout(() => uni.navigateBack(), 1500);
+						} else {
+							uni.showToast({ title: cancelRes.msg || '取消失败', icon: 'none' });
+						}
+					} catch (e) {
+						uni.showToast({ title: '取消订单失败，请稍后重试', icon: 'none' });
+					} finally {
+						uni.hideLoading();
+					}
+				}
+			},
+		});
+	}
+
+	// ── 执行支付/授权流程（押金 or 支付分）──
+	async function executePaymentFlow(tradeNo, depositMoney, riskAmount) {
+		if (payMode.value === 'deposit' && depositMoney > 0) {
+			// 押金支付
+			uni.showLoading({ title: '正在发起支付...', mask: true });
+			const amount = Number((depositMoney / 100).toFixed(2));
+			const openId = uni.getStorageSync('openId') || '';
+			const payRes = await api.createPayment({
+				tradeNo,
+				amount,
+				payScene: 'DEPOSIT_PAY',
+				openId,
+				description: '外骨骼租赁押金',
+			});
+			console.log('[Pay] createPayment:', payRes);
+			if (!(payRes.code === 200 || payRes.code === 0) || !payRes.data) {
+				uni.hideLoading();
+				await showCancelOption(tradeNo, payRes.msg || '支付发起失败，是否取消订单？');
+				return false;
+			}
+			const payData = payRes.data;
+			let payNo = payData.payNo || '';
+
+			// 拉起微信支付
+			const payParams = {
+				timeStamp: String(payData.timeStamp || payData.timestamp || ''),
+				nonceStr: payData.nonceStr || '',
+				package: payData.package || payData.packAge || '',
+				signType: payData.signType || 'RSA',
+				paySign: payData.paySign || '',
+			};
+			console.log('[Pay] requestPayment params:', payParams);
+
+			// #ifdef MP-WEIXIN
+			const wxPayRes = await new Promise((resolve) => {
+				wx.requestPayment({
+					...payParams,
+					success: (res) => resolve({ success: true, data: res }),
+					fail: (err) => resolve({ success: false, error: err }),
+				});
+			});
+			// #endif
+			// #ifndef MP-WEIXIN
+			const wxPayRes = await new Promise((resolve) => {
+				uni.requestPayment({
+					provider: 'wxpay',
+					...payParams,
+					success: (res) => resolve({ success: true, data: res }),
+					fail: (err) => resolve({ success: false, error: err }),
+				});
+			});
+			// #endif
+			console.log('[Pay] requestPayment result:', wxPayRes);
+			if (!wxPayRes.success) {
+				uni.hideLoading();
+				const errMsg = wxPayRes.error?.errMsg || '';
+				if (errMsg.includes('cancel') || errMsg.includes('fail')) {
+					await showCancelOption(tradeNo, '支付未完成，是否取消订单？');
+				} else {
+					uni.showToast({ title: '支付失败', icon: 'none', duration: 3000 });
+				}
+				return false;
+			}
+
+			// 主动查询微信侧订单状态
+			if (payNo) {
+				uni.showLoading({ title: '查询支付状态...', mask: true });
+				const wxStatusRes = await api.getWechatStatus(payNo);
+				console.log('[Pay] wechat-status:', wxStatusRes);
+				if (wxStatusRes.data === 'SUCCESS') {
+					// 微信确认支付成功，继续流程
+				} else {
+					uni.hideLoading();
+					uni.showModal({
+						title: '支付状态确认',
+						content: '暂未查询到支付成功信息，请稍后重试或检查微信支付记录。',
+						confirmText: '重新查询',
+						cancelText: '取消',
+						success: async (modalRes) => {
+							if (modalRes.confirm) {
+								uni.showLoading({ title: '查询支付状态...', mask: true });
+								const retryRes = await api.getWechatStatus(payNo);
+								console.log('[Pay] wechat-status retry:', retryRes);
+								if (retryRes.data === 'SUCCESS') {
+									uni.hideLoading();
+									uni.showToast({ title: '支付确认成功', icon: 'success' });
+									await continueAfterPaySuccess(tradeNo);
+								} else {
+									uni.hideLoading();
+									uni.showToast({ title: '仍未查询到支付成功，请稍后再试', icon: 'none', duration: 3000 });
+								}
+							}
+						},
+					});
+					return false;
+				}
+			}
+
+			// 主动确认支付（通知后端支付成功）
+			if (payNo) {
+				uni.showLoading({ title: '确认支付...', mask: true });
+				const confirmRes = await api.paymentConfirm(payNo);
+				if (!(confirmRes.code === 200 || confirmRes.code === 0)) {
+					uni.showToast({ title: confirmRes.msg || '支付确认失败', icon: 'none' });
+					return false;
+				}
+			}
+
+			// 押金确认取件
+			await continueAfterPaySuccess(tradeNo);
+			return true;
+		} else if (payMode.value === 'payscore') {
+			// 微信支付分免押模式
+			uni.showLoading({ title: '正在发起免押授权...', mask: true });
+			const openId = uni.getStorageSync('openId') || '';
+			const depositAmount = Number((depositMoney / 100).toFixed(2)) || Number(feeDeposit.value) || 500;
+			const riskRes = await api.createPreAuthRisk({
+				tradeNo,
+				amount: depositAmount,
+				openId,
+				description: '外骨骼租赁押金',
+			});
+			console.log('[PayScore] createPreAuthRisk:', riskRes);
+			if (!(riskRes.code === 200 || riskRes.code === 0) || !riskRes.data) {
+				uni.hideLoading();
+				await showCancelOption(tradeNo, riskRes.msg || '免押授权发起失败，是否取消订单？');
+				return false;
+			}
+			const riskData = riskRes.data;
+			const riskPayNo = riskData.payNo || '';
+
+			// 拉起微信支付分确认页
+			uni.hideLoading();
+			const wxBizRes = await new Promise((resolve) => {
+				wx.openBusinessView({
+					businessType: 'wxpayScoreUse',
+					extraData: { package: riskData.packAge || riskData.package || '' },
+					success: (res) => resolve({ success: true, data: res }),
+					fail: (err) => resolve({ success: false, error: err }),
+				});
+			});
+			console.log('[PayScore] openBusinessView result:', wxBizRes);
+
+			if (!wxBizRes.success) {
+				uni.showToast({ title: '授权已取消，可使用押金租借', icon: 'none', duration: 2500 });
+				payMode.value = 'deposit';
+				return false;
+			}
+
+			// 轮询查询免押确认结果（最多6次，间隔1.5s）
+			uni.showLoading({ title: '正在确认授权...', mask: true });
+			let authConfirmed = false;
+			for (let i = 0; i < 6; i++) {
+				await new Promise(r => setTimeout(r, 1500));
+				const confirmRes = await api.confirmRiskAuth(riskPayNo);
+				console.log(`[PayScore] confirmRiskAuth attempt ${i + 1}:`, confirmRes);
+				if ((confirmRes.code === 200 || confirmRes.code === 0) && confirmRes.data === 1) {
+					authConfirmed = true;
+					break;
+				}
+			}
+
+			if (!authConfirmed) {
+				uni.hideLoading();
+				uni.showModal({
+					title: '授权确认中',
+					content: '暂未确认授权结果，请稍后在订单列表中继续操作，或使用押金租借。',
+					confirmText: '使用押金租借',
+					cancelText: '我知道了',
+					success: (modalRes) => {
+						if (modalRes.confirm) {
+							payMode.value = 'deposit';
+						}
+					},
+				});
+				return false;
+			}
+
+			// 授权成功，确认取件
+			uni.showLoading({ title: '正在确认...', mask: true });
+			const confirmPayRes = await api.depositConfirm(tradeNo);
+			if (!(confirmPayRes.code === 200 || confirmPayRes.code === 0)) {
+				uni.showToast({ title: confirmPayRes.msg || '确认失败', icon: 'none' });
+				return false;
+			}
+			return true;
+		} else {
+			// 押金为0，直接确认
+			await continueAfterPaySuccess(tradeNo);
+			return true;
+		}
+	}
+
 	async function onConfirm() {
 		if (!canConfirm.value) {
 			if (!selectedSlot.value) {
-				uni.showToast({
-					title: '请选择设备',
-					icon: 'none'
-				});
+				uni.showToast({ title: '请选择设备', icon: 'none' });
 			} else if (!agreed.value) {
-				uni.showToast({
-					title: '请同意租赁协议',
-					icon: 'none'
-				});
+				uni.showToast({ title: '请同意租赁协议', icon: 'none' });
 			}
 			return;
 		}
 
+		const dev = selectedSlot.value.device;
+		const feeTemplate = cabinet.value.feeTemplate || {};
+
+		// ── 继续支付模式：跳过创建订单，直接执行支付/授权 ──
+		if (isContinuePay.value && continueTradeNo.value) {
+			uni.showLoading({ title: '获取订单信息...', mask: true });
+			try {
+				const orderRes = await api.getLeaseStatusByTradeNo(continueTradeNo.value);
+				if (!(orderRes.code === 200 || orderRes.code === 0) || !orderRes.data) {
+					uni.showToast({ title: orderRes.msg || '获取订单信息失败', icon: 'none' });
+					return;
+				}
+				const order = orderRes.data;
+				const tradeNo = order.tradeNo || continueTradeNo.value;
+				const depositMoney = order.depositMoney || 0;
+				const riskAmount = order.riskAmount || 0;
+
+				const success = await executePaymentFlow(tradeNo, depositMoney, riskAmount);
+				if (success) {
+					const d = {
+						deviceSn: dev.deviceSn,
+						hourlyRate: dev.hourlyRate || feeTemplate.hourlyRate || 0,
+						freeMinutes: dev.freeMinutes || feeTemplate.freeMinutes || 0,
+						depositMoney: dev.depositMoney || feeTemplate.depositMoney || 0,
+					};
+					const rate = d.hourlyRate;
+					const freeMin = d.freeMinutes;
+					const deposit = d.depositMoney;
+					const cabinetIdVal = cabinet.value.id || cabinet.value.cabinetNo || '';
+					uni.navigateTo({
+						url: `/pages/device/demo-control?tradeNo=${tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(dev.deviceName || '外骨骼设备')}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}&cabinetId=${cabinetIdVal}`
+					});
+				}
+			} catch (e) {
+				uni.showToast({ title: e.message || '请求失败', icon: 'none' });
+			} finally {
+				uni.hideLoading();
+			}
+			return;
+		}
+
+		// ── 普通租借流程 ──
 		// 校验用户与柜机距离（不超过20米）
 		uni.showLoading({ title: '正在校验距离...', mask: true });
 		try {
@@ -400,29 +682,18 @@
 			uni.hideLoading();
 		}
 
-		const dev = selectedSlot.value.device;
-		uni.showLoading({
-			title: '获取设备信息...',
-			mask: true
-		});
+		uni.showLoading({ title: '获取设备信息...', mask: true });
 		try {
 			// 1. 扫码获取设备信息
 			const scanRes = await api.scanDevice(dev.deviceSn);
 			if (!(scanRes.code === 200 || scanRes.code === 0) || !scanRes.data) {
-				uni.showToast({
-					title: scanRes.msg || '设备信息获取失败',
-					icon: 'none'
-				});
+				uni.showToast({ title: scanRes.msg || '设备信息获取失败', icon: 'none' });
 				return;
 			}
 			const d = scanRes.data;
 
 			// 2. 创建订单（传完整参数）
-			uni.showLoading({
-				title: '创建订单...',
-				mask: true
-			});
-			const feeTemplate = cabinet.value.feeTemplate || {};
+			uni.showLoading({ title: '创建订单...', mask: true });
 			const confirmRes = await api.confirmLease({
 				deviceSn: d.deviceSn,
 				pickupCabinetId: cabinet.value.id,
@@ -431,10 +702,7 @@
 				payScene: payMode.value === 'payscore' ? 'RISK_AUTH' : 'DEPOSIT_PAY',
 			});
 			if (!(confirmRes.code === 200 || confirmRes.code === 0) || !confirmRes.data) {
-				uni.showToast({
-					title: confirmRes.msg || '创建订单失败',
-					icon: 'none'
-				});
+				uni.showToast({ title: confirmRes.msg || '创建订单失败', icon: 'none' });
 				return;
 			}
 			const order = confirmRes.data;
@@ -442,215 +710,20 @@
 			const depositMoney = order.depositMoney || 0;
 			const riskAmount = order.riskAmount || 0;
 
-			// 3. 押金模式：需要微信支付押金；免押模式：跳过支付直接确认
-			if (payMode.value === 'deposit' && depositMoney > 0) {
-				uni.showLoading({
-					title: '正在发起支付...',
-					mask: true
+			// 3. 执行支付/授权流程
+			const success = await executePaymentFlow(tradeNo, depositMoney, riskAmount);
+			if (success) {
+				// 4. 跳转到设备控制页
+				const rate = d.hourlyRate || feeTemplate.hourlyRate || 0;
+				const freeMin = d.freeMinutes || feeTemplate.freeMinutes || 0;
+				const deposit = d.depositMoney || feeTemplate.depositMoney || 0;
+				const cabinetIdVal = cabinet.value.id || cabinet.value.cabinetNo || '';
+				uni.navigateTo({
+					url: `/pages/device/demo-control?tradeNo=${tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(dev.deviceName || '外骨骼设备')}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}&cabinetId=${cabinetIdVal}`
 				});
-				const amount = Number((depositMoney / 100).toFixed(2));
-				const openId = uni.getStorageSync('openId') || '';
-				const payRes = await api.createPayment({
-					tradeNo,
-					amount,
-					payScene: 'DEPOSIT_PAY',
-					openId,
-					description: '外骨骼租赁押金',
-				});
-				console.log('[Pay] createPayment:', payRes);
-				if (!(payRes.code === 200 || payRes.code === 0) || !payRes.data) {
-					uni.showToast({
-						title: payRes.msg || '支付发起失败',
-						icon: 'none'
-					});
-					return;
-				}
-				const payData = payRes.data;
-
-				// 4. 拉起微信支付
-				let payNo = payData.payNo || '';
-				uni.showLoading({
-					title: '等待支付完成...',
-					mask: true
-				});
-
-				// 构造支付参数（兼容不同后端字段命名）
-				const payParams = {
-					timeStamp: String(payData.timeStamp || payData.timestamp || ''),
-					nonceStr: payData.nonceStr || '',
-					package: payData.package || payData.packAge || '',
-					signType: payData.signType || 'RSA',
-					paySign: payData.paySign || '',
-				};
-				console.log('[Pay] requestPayment params:', payParams);
-
-				// #ifdef MP-WEIXIN
-				// 微信小程序：使用 wx.requestPayment，不需要 provider
-				const wxPayRes = await new Promise((resolve) => {
-					wx.requestPayment({
-						...payParams,
-						success: (res) => resolve({ success: true, data: res }),
-						fail: (err) => resolve({ success: false, error: err }),
-					});
-				});
-				// #endif
-				// #ifndef MP-WEIXIN
-				const wxPayRes = await new Promise((resolve) => {
-					uni.requestPayment({
-						provider: 'wxpay',
-						...payParams,
-						success: (res) => resolve({ success: true, data: res }),
-						fail: (err) => resolve({ success: false, error: err }),
-					});
-				});
-				// #endif
-				console.log('[Pay] requestPayment result:', wxPayRes);
-				if (!wxPayRes.success) {
-					const errMsg = '支付失败';
-					uni.showToast({
-						title: errMsg,
-						icon: 'none',
-						duration: 3000
-					});
-					return;
-				}
-
-				// 5. 主动查询微信侧订单状态
-				if (payNo) {
-					uni.showLoading({ title: '查询支付状态...', mask: true });
-					const wxStatusRes = await api.getWechatStatus(payNo);
-					console.log('[Pay] wechat-status:', wxStatusRes);
-					if (wxStatusRes.data === 'SUCCESS') {
-						// 微信确认支付成功，继续流程
-					} else {
-						uni.hideLoading();
-						uni.showModal({
-							title: '支付状态确认',
-							content: '暂未查询到支付成功信息，请稍后重试或检查微信支付记录。',
-							confirmText: '重新查询',
-							cancelText: '取消',
-							success: async (modalRes) => {
-								if (modalRes.confirm) {
-									// 用户点击重新查询，重新走查询逻辑
-									uni.showLoading({ title: '查询支付状态...', mask: true });
-									const retryRes = await api.getWechatStatus(payNo);
-									console.log('[Pay] wechat-status retry:', retryRes);
-									if (retryRes.data === 'SUCCESS') {
-										uni.hideLoading();
-										uni.showToast({ title: '支付确认成功', icon: 'success' });
-										// 手动继续后续流程
-										await continueAfterPaySuccess(tradeNo, d, feeTemplate, dev);
-									} else {
-										uni.hideLoading();
-										uni.showToast({ title: '仍未查询到支付成功，请稍后再试', icon: 'none', duration: 3000 });
-									}
-								}
-							},
-						});
-						return;
-					}
-				}
-
-				// 6. 主动确认支付（通知后端支付成功）
-				if (payNo) {
-					uni.showLoading({ title: '确认支付...', mask: true });
-					const confirmRes = await api.paymentConfirm(payNo);
-					if (!(confirmRes.code === 200 || confirmRes.code === 0)) {
-						uni.showToast({ title: confirmRes.msg || '支付确认失败', icon: 'none' });
-						return;
-					}
-				}
-
-				// 7. 押金确认取件
-				await continueAfterPaySuccess(tradeNo, d, feeTemplate, dev);
-			} else if (payMode.value === 'payscore') {
-				// 微信支付分免押模式
-				uni.showLoading({ title: '正在发起免押授权...', mask: true });
-				const openId = uni.getStorageSync('openId') || '';
-				const depositAmount = Number((depositMoney / 100).toFixed(2)) || Number(feeDeposit.value) || 500;
-				const riskRes = await api.createPreAuthRisk({
-					tradeNo,
-					amount: depositAmount,
-					openId,
-					description: '外骨骼租赁押金',
-				});
-				console.log('[PayScore] createPreAuthRisk:', riskRes);
-				if (!(riskRes.code === 200 || riskRes.code === 0) || !riskRes.data) {
-					uni.showToast({ title: riskRes.msg || '免押授权发起失败', icon: 'none' });
-					return;
-				}
-				const riskData = riskRes.data;
-				const riskPayNo = riskData.payNo || '';
-
-				// 拉起微信支付分确认页
-				uni.hideLoading();
-				const wxBizRes = await new Promise((resolve) => {
-					wx.openBusinessView({
-						businessType: 'wxpayScoreUse',
-						extraData: { package: riskData.packAge || riskData.package || '' },
-						success: (res) => resolve({ success: true, data: res }),
-						fail: (err) => resolve({ success: false, error: err }),
-					});
-				});
-				console.log('[PayScore] openBusinessView result:', wxBizRes);
-
-				if (!wxBizRes.success) {
-					uni.showToast({ title: '授权已取消，可使用押金租借', icon: 'none', duration: 2500 });
-					payMode.value = 'deposit';
-					return;
-				}
-
-				// 轮询查询免押确认结果（最多6次，间隔1.5s）
-				uni.showLoading({ title: '正在确认授权...', mask: true });
-				let authConfirmed = false;
-				for (let i = 0; i < 6; i++) {
-					await new Promise(r => setTimeout(r, 1500));
-					const confirmRes = await api.confirmRiskAuth(riskPayNo);
-					console.log(`[PayScore] confirmRiskAuth attempt ${i + 1}:`, confirmRes);
-					if ((confirmRes.code === 200 || confirmRes.code === 0) && confirmRes.data === 1) {
-						authConfirmed = true;
-						break;
-					}
-				}
-
-				if (!authConfirmed) {
-					uni.hideLoading();
-					uni.showModal({
-						title: '授权确认中',
-						content: '暂未确认授权结果，请稍后在订单列表中继续操作，或使用押金租借。',
-						confirmText: '使用押金租借',
-						cancelText: '我知道了',
-						success: (modalRes) => {
-							if (modalRes.confirm) {
-								payMode.value = 'deposit';
-							}
-						},
-					});
-					return;
-				}
-
-				// 授权成功，确认取件
-				uni.showLoading({ title: '正在确认...', mask: true });
-				const confirmPayRes = await api.depositConfirm(tradeNo);
-				if (!(confirmPayRes.code === 200 || confirmPayRes.code === 0)) {
-					uni.showToast({ title: confirmPayRes.msg || '确认失败', icon: 'none' });
-					return;
-				}
 			}
-
-			// 8. 跳转到设备控制页
-			const rate = d.hourlyRate || feeTemplate.hourlyRate || 0;
-			const freeMin = d.freeMinutes || feeTemplate.freeMinutes || 0;
-			const deposit = d.depositMoney || feeTemplate.depositMoney || 0;
-			const cabinetIdVal = cabinet.value.id || cabinet.value.cabinetNo || '';
-			uni.navigateTo({
-				url: `/pages/device/demo-control?tradeNo=${tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(dev.deviceName || '外骨骼设备')}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}&cabinetId=${cabinetIdVal}`
-			});
-	} catch (e) {
-			uni.showToast({
-				title: e.message || '请求失败',
-				icon: 'none'
-			});
+		} catch (e) {
+			uni.showToast({ title: e.message || '请求失败', icon: 'none' });
 		} finally {
 			uni.hideLoading();
 		}

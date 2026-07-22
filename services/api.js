@@ -188,6 +188,7 @@ export const api = {
   scanCabinet: (cabinetNo, params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/scan/cabinet/${cabinetNo}`, null, { params }),
   confirmLease: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/confirm`, data),
   returnDevice: (deviceSn, params) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${deviceSn}/return`, { deviceSn }, { params }),
+  cancelOrder: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/cancel`),
   depositConfirm: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/deposit-confirm`),
   settleOrder: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/settle`),
   getLeaseStatusByTradeNo: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/status`),

@@ -16,31 +16,35 @@
 		onLaunch: function() {
 			console.log('App Launch')
 
-			// 全局路由守卫：拦截 navigateTo / switchTab / redirectTo
-			['navigateTo', 'switchTab', 'redirectTo', 'reLaunch'].forEach(type => {
-				uni.addInterceptor(type, {
-					invoke(e) {
-						const url = e.url || '';
-						// 提取页面路径（去掉参数）
-						const path = url.split('?')[0].replace(/^\//, '');
-						// 检查是否在白名单中
-						const isPublic = NO_LOGIN_PAGES.some(p => path === p || path.startsWith(p));
-						if (isPublic) return; // 白名单放行
+			// 延迟注册路由拦截器，确保 uni 对象已初始化（微信小程序分包兼容）
+			setTimeout(() => {
+				if (typeof uni === 'undefined' || !uni.addInterceptor) return;
+				// 全局路由守卫：拦截 navigateTo / switchTab / redirectTo
+				['navigateTo', 'switchTab', 'redirectTo', 'reLaunch'].forEach(type => {
+					uni.addInterceptor(type, {
+						invoke(e) {
+							const url = e.url || '';
+							// 提取页面路径（去掉参数）
+							const path = url.split('?')[0].replace(/^\//, '');
+							// 检查是否在白名单中
+							const isPublic = NO_LOGIN_PAGES.some(p => path === p || path.startsWith(p));
+							if (isPublic) return; // 白名单放行
 
-						// 检查登录态
-						const token = uni.getStorageSync('token');
-						if (!token) {
-							// 跳转到首页，并提示
-							uni.showToast({ title: '请先登录', icon: 'none', duration: 1500 });
-							// 阻止原跳转，重定向到首页
-							const tabBarPages = ['pages/index/index', 'pages/history/list', 'pages/profile/my'];
-							if (tabBarPages.includes(path)) return; // tabBar 页面放行
-							// 修改跳转目标
-							e.url = '/pages/index/index';
-						}
-					},
+							// 检查登录态
+							const token = uni.getStorageSync('token');
+							if (!token) {
+								// 跳转到首页，并提示
+								uni.showToast({ title: '请先登录', icon: 'none', duration: 1500 });
+								// 阻止原跳转，重定向到首页
+								const tabBarPages = ['pages/index/index', 'pages/history/list', 'pages/profile/my'];
+								if (tabBarPages.includes(path)) return; // tabBar 页面放行
+								// 修改跳转目标
+								e.url = '/pages/index/index';
+							}
+						},
+					});
 				});
-			});
+			}, 0);
 		},
 		onShow: function() {
 			console.log('App Show')
