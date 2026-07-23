@@ -10,13 +10,13 @@ const ENV_CONFIG = {
     apiPrefix: '',
   },
   online: {
-    baseUrl: 'http://82.157.81.90:80',
+    baseUrl: 'https://nexaexorental.com/',
     apiPrefix: 'api/',
   },
 };
 
 // 切换环境：local | online
-const CURRENT_ENV = 'online';
+const CURRENT_ENV = 'local';
 const { baseUrl: BASE_URL, apiPrefix: API_PREFIX } = ENV_CONFIG[CURRENT_ENV];
 
 // ── 安全关闭 loading（防止 showToast 替换后报错） ──
@@ -171,48 +171,46 @@ function httpRequest(method, url, data = null, options = {}) {
 
 export const api = {
   // ── 用户 ──
-  wxXcxLogin: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}member/xcx/login`, data),
-  wxXcxAuthLogin: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}member/xcx/auth-login`, data),
-  updateXcxProfile: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}member/xcx/profile`, data),
-  getMemberInfo: () => httpRequest('GET', `${BASE_URL}/${API_PREFIX}member/info`),
-
-  // ==================== 外骨骼设备 ====================
+  wxXcxLogin: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/member/xcx/login`, data),
+  wxXcxAuthLogin: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/member/xcx/auth-login`, data),
+  updateXcxProfile: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/member/xcx/profile`, data),
+  getMemberInfo: () => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/member/info`),
 
   // ── 柜机 ──
-  getNearbyCabinets: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/cabinet/nearby`, null, { params }),
-  getCabinetDetail: (id) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/${id}`),
-  getCabinetDevices: (cabinetNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/cabinet/${cabinetNo}/devices`),
+  getNearbyCabinets: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/cabinet/nearby`, null, { params }),
+  getCabinetDetail: (id) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${id}`),
+  getCabinetDevices: (cabinetNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/cabinet/${cabinetNo}/devices`),
 
   // ── 租借 ──
-  scanDevice: (deviceSn) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/scan/${deviceSn}`),
-  scanCabinet: (cabinetNo, params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/scan/cabinet/${cabinetNo}`, null, { params }),
-  confirmLease: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/confirm`, data),
-  returnDevice: (deviceSn, params) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${deviceSn}/return`, { deviceSn }, { params }),
-  cancelOrder: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/cancel`),
-  depositConfirm: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/deposit-confirm`),
-  settleOrder: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/settle`),
-  getLeaseStatusByTradeNo: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/status`),
-  uploadTrajectory: (tradeNo, points) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/lease/${tradeNo}/trajectory`, { points }),
+  scanDevice: (deviceSn) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/lease/scan/${deviceSn}`),
+  scanCabinet: (cabinetNo, params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/lease/scan/cabinet/${cabinetNo}`, null, { params }),
+  confirmLease: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/confirm`, data),
+  returnDevice: (deviceSn, params) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${deviceSn}/return`, { deviceSn }, { params }),
+  cancelOrder: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/cancel`),
+  depositConfirm: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/deposit-confirm`),
+  settleOrder: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/settle`),
+  getLeaseStatusByTradeNo: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/status`),
+  uploadTrajectory: (tradeNo, points) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/trajectory`, { points }),
 
   // ── 支付 ──
-  createPayment: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/unified-order`, data),
-  paymentConfirm: (payNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/confirm?payNo=${payNo}`),
-  getPaymentStatus: (payNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/payment/${payNo}`),
-  getWechatStatus: (payNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/payment/wechat-status/${payNo}`),
+  createPayment: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/payment/unified-order`, data),
+  paymentConfirm: (payNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/payment/confirm?payNo=${payNo}`),
+  getPaymentStatus: (payNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/payment/${payNo}`),
+  getWechatStatus: (payNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/payment/wechat-status/${payNo}`),
   // 支付分免押订单
-  createPreAuthRisk: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/pre-auth-risk`, data),
-  confirmRiskAuth: (payNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}v1/payment/risk-auth/confirm?payNo=${payNo}`),
+  createPreAuthRisk: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/payment/pre-auth-risk`, data),
+  confirmRiskAuth: (payNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/payment/risk-auth/confirm?payNo=${payNo}`),
 
   // ── 网点 ──
-  getNearbyPlaces: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/places/nearby`, null, { params }),
-  getPlaceDetail: (id) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/places/${id}`),
+  getNearbyPlaces: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/places/nearby`, null, { params }),
+  getPlaceDetail: (id) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/places/${id}`),
 
   // ── 记录 ──
-  getMyOrders: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/record/order`, null, { params }),
-  getPaymentRecords: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/record/payment`, null, { params }),
-  getOrderTrack: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}v1/record/order/${tradeNo}/track`),
+  getMyOrders: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/record/order`, null, { params }),
+  getPaymentRecords: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/record/payment`, null, { params }),
+  getOrderTrack: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/record/order/${tradeNo}/track`),
 
   // ── 轨迹 ──
-  reportTrajectory: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}member/trajectory/report`, data),
-  getTrajectoryList: (deviceSn, startDate, endDate) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}member/trajectory/list`, null, { params: { deviceSn, startDate, endDate } }),
+  reportTrajectory: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/member/trajectory/report`, data),
+  getTrajectoryList: (deviceSn, startDate, endDate) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/member/trajectory/list`, null, { params: { deviceSn, startDate, endDate } }),
 };

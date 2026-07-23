@@ -814,7 +814,7 @@
 	/* 顶部信息卡片 */
 	.header-card {
 		background: #fff;
-		margin: 12px 16px 0;
+		margin: 0 16px;
 		border-radius: 16px;
 		padding: 16px;
 		display: flex;
