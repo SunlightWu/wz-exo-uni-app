@@ -75,7 +75,7 @@
 				</view>
 			</view>
 			<!-- 计费进度条 -->
-			<view v-if="freeMinutes > 0" class="billing-progress">
+			<!-- <view v-if="freeMinutes > 0" class="billing-progress">
 				<view class="progress-track">
 					<view class="progress-fill" :style="{ width: progressPercent + '%' }" :class="{ 'progress-paid': elapsedSeconds > freeMinutes * 60 }"></view>
 				</view>
@@ -83,7 +83,7 @@
 					<text class="progress-label" :class="{ 'progress-active': elapsedSeconds <= freeMinutes * 60 }">免费期</text>
 					<text class="progress-label" :class="{ 'progress-active': elapsedSeconds > freeMinutes * 60 }">计费期</text>
 				</view>
-			</view>
+			</view> -->
 			<view v-if="freeMinutes > 0" class="cost-hint">
 				<text v-if="elapsedSeconds <= freeMinutes * 60">免费剩余 {{ freeMinutes - Math.floor(elapsedSeconds / 60) }} 分钟</text>
 				<text v-else>已进入计费期，当前第 {{ billableHoursText }}</text>
@@ -114,7 +114,7 @@
 				</view>
 				<view class="track-stats">
 					<text class="track-stat">共 {{ trajectoryPoints.length }} 个轨迹点</text>
-					<text class="track-stat">已运动 {{ formatMinutes(elapsedSeconds) }}</text>
+					<!-- <text class="track-stat">已运动 {{ formatMinutes(elapsedSeconds) }}</text> -->
 				</view>
 			</view>
 			<view v-else class="track-empty">
@@ -126,9 +126,6 @@
 		<view class="finish-section">
 			<view class="finish-btn" @click="onFinish">
 				<text>结束使用</text>
-			</view>
-			<view class="feedback-btn" @click="onFeedback">
-				<text>遇到问题，反馈问题</text>
 			</view>
 		</view>
 
@@ -328,11 +325,20 @@
 			id: 0,
 			latitude: pts[0].latitude,
 			longitude: pts[0].longitude,
-			title: '起点',
 			iconPath: '/static/marker-start.png',
-			width: 24,
-			height: 24,
-			callout: { content: '起点', display: 'ALWAYS', fontSize: 10, borderRadius: 4, padding: 4, bgColor: '#fff' },
+			width: 32,
+			height: 32,
+			anchor: { x: 0.5, y: 1 },
+			callout: {
+				content: '起点',
+				display: 'ALWAYS',
+				fontSize: 11,
+				borderRadius: 6,
+				padding: 6,
+				bgColor: '#fff',
+				color: '#306afc',
+				textAlign: 'center',
+			},
 		});
 		// 终点
 		if (pts.length > 1) {
@@ -341,11 +347,20 @@
 				id: 1,
 				latitude: last.latitude,
 				longitude: last.longitude,
-				title: '终点',
 				iconPath: '/static/marker-end.png',
-				width: 24,
-				height: 24,
-				callout: { content: '终点', display: 'ALWAYS', fontSize: 10, borderRadius: 4, padding: 4, bgColor: '#fff' },
+				width: 32,
+				height: 32,
+				anchor: { x: 0.5, y: 1 },
+				callout: {
+					content: '终点',
+					display: 'ALWAYS',
+					fontSize: 11,
+					borderRadius: 6,
+					padding: 6,
+					bgColor: '#fff',
+					color: '#ef4444',
+					textAlign: 'center',
+				},
 			});
 		}
 		return markers;
@@ -525,6 +540,7 @@
 							uni.redirectTo({
 								url: `/pages/device/completed?tradeNo=${res.data.tradeNo}&duration=${elapsedSeconds.value}`,
 							});
+							uni.hideLoading();
 						}else {
 							uni.showToast({
 								title: res.msg || '归还失败',
@@ -538,9 +554,7 @@
 						title: e.message || '归还失败',
 						icon: 'none'
 					});
-				} finally {
-					uni.hideLoading();
-				}
+				} 
 			},
 		});
 	}

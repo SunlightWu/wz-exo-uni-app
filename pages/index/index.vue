@@ -128,6 +128,9 @@
 				</view>
 			</scroll-view>
 		</BottomDrawer>
+
+		<!-- 手机号授权弹出层 -->
+		<phone-auth-popup :show="showAuth" @success="onPhoneAuthSuccess" />
 	</view>
 </template>
 
@@ -157,6 +160,7 @@
 		resetLocationDedup
 	} from '../../services/location.js';
 import { parseDate } from '../../utils/format.js';
+	import { usePhoneAuth } from '../../composables/usePhoneAuth.js';
 	import {
 		parseDeviceQr
 	} from '../../utils/qr-parser.js';
@@ -167,6 +171,14 @@ import { parseDate } from '../../utils/format.js';
 
 	const deviceStore = useDeviceStore();
 	const userStore = useUserStore();
+	const { showAuth, ensurePhoneBound, onAuthSuccess } = usePhoneAuth();
+
+	// 包装 onAuthSuccess：登录成功后初始化页面数据
+	async function onPhoneAuthSuccess() {
+		onAuthSuccess()
+		uni.showTabBar()
+		await initPageData()
+	}
 
 	const statusBarHeight = ref(20)
 	const locating = ref(false)
@@ -432,15 +444,24 @@ import { parseDate } from '../../utils/format.js';
 		const sys = await uni.getSystemInfo()
 		statusBarHeight.value = sys.statusBarHeight || 20
 
-		// 并行：静默登录 + 检查进行中订单 + 检查待支付订单
-		// 登录依赖用户状态，订单查询需要网络，可以并行减少等待
+		// ── 第一步：检查登录态 ──
+		// 无 token → 弹出手机号授权层，登录成功前不执行后续逻辑
+		if (!userStore.token) {
+			uni.hideTabBar()
+			showAuth.value = true
+			return // 登录成功后由 onAuthSuccess 触发后续初始化
+		}
+
+		// ── 第二步：已登录，拉取会员信息并初始化 ──
+		await initPageData()
+	})
+
+	// 首页初始化逻辑（登录成功后也会调用）
+	async function initPageData() {
 		const [loginDone, hasActiveLease, hasPendingPayment] = await Promise.all([
 			(async () => {
-				if (!userStore.token) {
-					await userStore.login()
-				}
 				if (userStore.token) {
-					userStore.fetchMemberInfo()
+					await userStore.fetchMemberInfo()
 				}
 				return true
 			})(),
@@ -457,7 +478,7 @@ import { parseDate } from '../../utils/format.js';
 			mapContext = uni.createMapContext('mapEl', null);
 			getLocation();
 		}, 400);
-	});
+	}
 
 	let isFirstShow = true;
 
@@ -742,13 +763,15 @@ import { parseDate } from '../../utils/format.js';
 		});
 	}
 
-	function goToScanning() {
+	async function goToScanning() {
+		if (!await ensurePhoneBound()) return;
 		uni.navigateTo({
 			url: '/pages/device/scanning'
 		})
 	}
 
-	function goToLeaseControl() {
+	async function goToLeaseControl() {
+		if (!await ensurePhoneBound()) return;
 		if (!deviceStore.leaseRunning) return;
 		const sn = deviceStore.leaseDeviceSn || '';
 		const rate = deviceStore.leaseRate || 0;
@@ -760,7 +783,8 @@ import { parseDate } from '../../utils/format.js';
 		});
 	}
 
-	function goToPendingOrder() {
+	async function goToPendingOrder() {
+		if (!await ensurePhoneBound()) return;
 		if (!pendingOrder.value?.tradeNo) return;
 		uni.navigateTo({
 			url: `/pages/device/completed?tradeNo=${pendingOrder.value.tradeNo}`,

@@ -16,7 +16,7 @@ const ENV_CONFIG = {
 };
 
 // 切换环境：local | online
-const CURRENT_ENV = 'local';
+const CURRENT_ENV = 'online';
 const { baseUrl: BASE_URL, apiPrefix: API_PREFIX } = ENV_CONFIG[CURRENT_ENV];
 
 // ── 安全关闭 loading（防止 showToast 替换后报错） ──
@@ -45,6 +45,17 @@ function clearTokens() {
   uni.removeStorageSync(REFRESH_TOKEN_KEY);
 }
 
+// ── Token 失效回调 ──
+let _onTokenExpired = null;
+
+/**
+ * 注册 token 失效回调（由 App.vue 调用）
+ * @param {Function} cb - token 失效时执行，通常用于弹出手机号授权层
+ */
+export function setOnTokenExpired(cb) {
+  _onTokenExpired = cb;
+}
+
 // ── 刷新 token ──
 let isRefreshing = false;
 let refreshQueue = [];
@@ -53,7 +64,7 @@ const MAX_REFRESH_RETRY = 1;
 
 async function doRefreshToken() {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) throw new Error('无刷新令牌');
+  if (!refreshToken) throw new Error('NO_REFRESH_TOKEN');
 
   if (isRefreshing) {
     return new Promise((resolve, reject) => {
@@ -86,23 +97,6 @@ async function doRefreshToken() {
     }
     throw new Error(res.msg || '刷新失败');
   } catch (e) {
-    // 刷新失败：尝试自动重新静默登录（最多 1 次）
-    if (refreshRetryCount < MAX_REFRESH_RETRY) {
-      refreshRetryCount++;
-      try {
-        const { wxLogin } = await import('./auth.js');
-        const loginResult = await wxLogin();
-        if (loginResult.success) {
-          setTokens(loginResult.data.token, loginResult.data.refreshToken);
-          refreshQueue.forEach(q => q.resolve(loginResult.data.token));
-          refreshQueue = [];
-          refreshRetryCount = 0;
-          return loginResult.data.token;
-        }
-      } catch (reLoginErr) {
-        console.error('[Refresh] 自动重登录失败:', reLoginErr.message);
-      }
-    }
     refreshQueue.forEach(q => q.reject(e));
     refreshQueue = [];
     clearTokens();
@@ -113,7 +107,22 @@ async function doRefreshToken() {
   }
 }
 
-// ── 真实 HTTP 请求（支持 401 自动刷新） ──
+/**
+ * 处理 token 失效：清除登录态，触发重新登录弹出层
+ */
+function handleTokenExpired(reason) {
+  console.warn('[HTTP] Token 已失效:', reason);
+  clearTokens();
+
+  // 触发全局 token 失效回调（弹出手机号授权层）
+  if (_onTokenExpired) {
+    _onTokenExpired();
+  } else {
+    uni.showToast({ title: '登录已失效，请重新登录', icon: 'none' });
+  }
+}
+
+// ── 真实 HTTP 请求（支持 401/40103 自动处理） ──
 function httpRequest(method, url, data = null, options = {}) {
   return new Promise((resolve, reject) => {
     const token = getToken();
@@ -141,23 +150,32 @@ function httpRequest(method, url, data = null, options = {}) {
         header: headers,
         timeout: options.timeout || 10000,
         success: async (res) => {
+          // HTTP 401 —— Token 过期
           if (res.statusCode === 401) {
             try {
               await doRefreshToken();
               doRequest();
             } catch (e) {
-              reject(e);
-              uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' });
+              handleTokenExpired('HTTP 401');
+              reject(new Error('登录已过期'));
             }
             return;
           }
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(res.data);
-          } else {
 
-            const msg = res.data?.message || res.data?.msg || `服务器错误 (${res.statusCode})`;
-            reject(new Error(`HTTP ${res.statusCode}: ${msg}`));
+          // HTTP 2xx 但业务码 40103 —— Token 已失效
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            const body = res.data || {};
+            if (body.code === 40103) {
+              handleTokenExpired(`业务码 ${body.code}: ${body.msg || 'Token 已失效'}`);
+              reject(new Error(body.msg || 'Token 已失效，请重新登录'));
+              return;
+            }
+            resolve(body);
+            return;
           }
+
+          const msg = res.data?.message || res.data?.msg || `服务器错误 (${res.statusCode})`;
+          reject(new Error(`HTTP ${res.statusCode}: ${msg}`));
         },
         fail: (err) => {
           reject(new Error(err.errMsg || '网络请求失败'));
@@ -175,6 +193,33 @@ export const api = {
   wxXcxAuthLogin: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/member/xcx/auth-login`, data),
   updateXcxProfile: (data) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/member/xcx/profile`, data),
   getMemberInfo: () => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/member/info`),
+
+  // ── 文件 ──
+  uploadFile: (filePath, dir) => new Promise((resolve, reject) => {
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    uni.uploadFile({
+      url: `${BASE_URL}/${API_PREFIX}mini/file/upload`,
+      filePath,
+      name: 'file',
+      formData: { dir: dir || 'avatar' },
+      header: headers,
+      success: (res) => {
+        try {
+          const body = JSON.parse(res.data);
+          if (body.code === 200 && body.data) {
+            resolve(body.data);
+          } else {
+            reject(new Error(body.msg || '上传失败'));
+          }
+        } catch (e) {
+          reject(new Error('上传响应解析失败'));
+        }
+      },
+      fail: (err) => reject(new Error(err.errMsg || '上传失败')),
+    });
+  }),
 
   // ── 柜机 ──
   getNearbyCabinets: (params) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/cabinet/nearby`, null, { params }),

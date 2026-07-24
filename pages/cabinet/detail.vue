@@ -640,7 +640,7 @@
 					const freeMin = d.freeMinutes;
 					const deposit = d.depositMoney;
 					const cabinetIdVal = cabinet.value.id || cabinet.value.cabinetNo || '';
-					uni.navigateTo({
+					uni.redirectTo({
 						url: `/pages/device/demo-control?tradeNo=${tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(dev.deviceName || '外骨骼设备')}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}&cabinetId=${cabinetIdVal}`
 					});
 				}
@@ -653,7 +653,7 @@
 		}
 
 		// ── 普通租借流程 ──
-		// 校验用户与柜机距离（不超过20米）
+		// 校验用户与柜机距离（不超过300米）
 		uni.showLoading({ title: '正在校验距离...', mask: true });
 		try {
 			const loc = await new Promise((resolve) => {
@@ -674,12 +674,12 @@
 				return;
 			}
 			const dist = haversine(loc.lat, loc.lng, cabinetLat, cabinetLng);
-			if (dist > 20) {
-				uni.showToast({ title: '距离柜机过远，请在20米范围内租借', icon: 'none', duration: 2500 });
+			if (dist > 300) {
+				uni.showToast({ title: '距离柜机过远，请在300米范围内租借', icon: 'none', duration: 2500 });
 				return;
 			}
 		} finally {
-			uni.hideLoading();
+			// uni.hideLoading();
 		}
 
 		uni.showLoading({ title: '获取设备信息...', mask: true });
@@ -718,7 +718,7 @@
 				const freeMin = d.freeMinutes || feeTemplate.freeMinutes || 0;
 				const deposit = d.depositMoney || feeTemplate.depositMoney || 0;
 				const cabinetIdVal = cabinet.value.id || cabinet.value.cabinetNo || '';
-				uni.navigateTo({
+				uni.redirectTo({
 					url: `/pages/device/demo-control?tradeNo=${tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(dev.deviceName || '外骨骼设备')}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}&cabinetId=${cabinetIdVal}`
 				});
 			}

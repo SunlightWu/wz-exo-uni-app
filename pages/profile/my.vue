@@ -23,11 +23,13 @@
 						<view v-else class="avatar-default">
 							<u-icon name="account-fill" color="$primaryColor" size="32"></u-icon>
 						</view>
-						<view v-if="!userInfo.avatar || !userInfo.nickname || userInfo.nickname === '微信用户'" class="avatar-hint">点击完善资料</view>
+						<view v-if="!userInfo.avatar || !userInfo.nickname || userInfo.nickname === '微信用户'"
+							class="avatar-hint">点击完善资料</view>
 					</view>
 					<view class="user-meta">
 						<text class="nickname-text">{{ userInfo.nickname || '微信用户' }}</text>
-						<button v-if="!phoneBound" class="phone-login-btn" open-type="getPhoneNumber" @getphonenumber="onGetPhoneNumber">
+						<button v-if="!phoneBound" class="phone-login-btn" open-type="getPhoneNumber"
+							@getphonenumber="onGetPhoneNumber">
 							<u-icon name="phone-fill" color="#fff" size="12"></u-icon>
 							<text>手机号登录</text>
 							<u-icon name="arrow-right" color="rgba(255,255,255,0.6)" size="10"></u-icon>
@@ -171,7 +173,8 @@
 				<view class="edit-body">
 					<!-- 头像选择 -->
 					<button class="edit-avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
-						<image v-if="userInfo.avatar" class="edit-avatar-img" :src="userInfo.avatar" mode="aspectFill"></image>
+						<image v-if="editAvatar" class="edit-avatar-img" :src="editAvatar"
+							mode="aspectFill"></image>
 						<view v-else class="edit-avatar-placeholder">
 							<u-icon name="plus" color="$primaryColor" size="24"></u-icon>
 							<text class="edit-avatar-text">选择头像</text>
@@ -180,13 +183,8 @@
 					<!-- 昵称输入 -->
 					<view class="edit-field">
 						<text class="edit-label">昵称</text>
-						<input
-							type="nickname"
-							class="edit-input"
-							placeholder="请输入昵称"
-							:value="editNickname"
-							@blur="onNicknameBlur"
-						/>
+						<input type="nickname" class="edit-input" placeholder="请输入昵称" :value="editNickname"
+							@blur="onNicknameBlur" />
 					</view>
 				</view>
 				<view class="edit-footer">
@@ -206,10 +204,15 @@
 		useUserStore
 	} from '../../store/user.js';
 	import {
-		api
+		api,
+		BASE_URL
 	} from '../../services/api.js';
 
 	const userStore = useUserStore();
+	// 头像相对路径转完整 URL
+	function avatarFullUrl(url) {
+		return url && !url.startsWith('http') ? `${BASE_URL}${url}` : (url || '')
+	}
 	const statusBarHeight = ref(20)
 	const userInfo = ref({
 		nickname: '微信用户',
@@ -220,6 +223,7 @@
 	// 资料编辑面板
 	const showEditPanel = ref(false)
 	const editNickname = ref('')
+	const editAvatar = ref('')
 	const totalSessions = ref(12)
 	const totalHours = ref('8.4')
 	const totalSteps = ref(32470)
@@ -271,15 +275,25 @@
 	async function onGetPhoneNumber(e) {
 		const detail = e.detail
 		if (!detail || detail.errMsg !== 'getPhoneNumber:ok') {
-			uni.showToast({ title: '需要手机号才能使用完整功能', icon: 'none', duration: 2000 })
+			uni.showToast({
+				title: '需要手机号才能使用完整功能',
+				icon: 'none',
+				duration: 2000
+			})
 			return
 		}
 		if (!detail.code) {
-			uni.showToast({ title: '获取手机号失败', icon: 'none' })
+			uni.showToast({
+				title: '获取手机号失败',
+				icon: 'none'
+			})
 			return
 		}
 
-		uni.showLoading({ title: '手机号登录中...', mask: true })
+		uni.showLoading({
+			title: '手机号登录中...',
+			mask: true
+		})
 		try {
 			const success = await userStore.phoneLogin(detail.code)
 			if (success) {
@@ -287,13 +301,22 @@
 				phoneNumber.value = userStore.phoneNumber
 				userInfo.value.nickname = userStore.userInfo.nickname
 				userInfo.value.avatar = userStore.userInfo.avatar
-				uni.showToast({ title: '手机号登录成功', icon: 'success' })
+				uni.showToast({
+					title: '手机号登录成功',
+					icon: 'success'
+				})
 			} else {
-				uni.showToast({ title: '手机号绑定失败', icon: 'none' })
+				uni.showToast({
+					title: '手机号绑定失败',
+					icon: 'none'
+				})
 			}
 		} catch (err) {
 			console.error('[PhoneLogin] 手机号登录异常:', err.message || err)
-			uni.showToast({ title: '网络异常，请重试', icon: 'none' })
+			uni.showToast({
+				title: '网络异常，请重试',
+				icon: 'none'
+			})
 		} finally {
 			uni.hideLoading()
 		}
@@ -301,18 +324,35 @@
 
 	// ── 打开资料编辑面板 ──
 	function onAvatarTap() {
-		editNickname.value = userInfo.value.nickname === '微信用户' ? '' : userInfo.value.nickname
+		editNickname.value = userInfo.value.nickname
+		editAvatar.value = userInfo.value.avatar
 		showEditPanel.value = true
 	}
 
 	// ── 选择头像（微信规范：button open-type="chooseAvatar"） ──
-	function onChooseAvatar(e) {
-		const avatarUrl = e.detail.avatarUrl || ''
-		if (avatarUrl) {
-			userInfo.value.avatar = avatarUrl
-			uni.setStorageSync('wxUserInfo', {
-				nickName: userInfo.value.nickname,
-				avatarUrl,
+	// 拿到临时地址后先上传到自己的服务器，再使用返回的 URL
+	async function onChooseAvatar(e) {
+		const tempUrl = e.detail.avatarUrl || ''
+		if (!tempUrl) return
+
+		uni.showLoading({
+			title: '上传头像中...',
+			mask: true
+		})
+		try {
+			// 上传到自己的服务器，返回相对路径如 /files/avatar/2026/07/xxx.jpg
+			const relativeUrl = await api.uploadFile(tempUrl, 'avatar')
+			console.log('[Avatar] 上传成功:', relativeUrl)
+
+			// 后端保存相对路径，前端拼接展示
+			editAvatar.value = `${BASE_URL}${relativeUrl}`
+			uni.hideLoading()
+		} catch (err) {
+			console.error('[Avatar] 上传失败:', err.message || err)
+			uni.hideLoading()
+			uni.showToast({
+				title: '头像上传失败',
+				icon: 'none'
 			})
 		}
 	}
@@ -332,36 +372,39 @@
 
 	// ── 保存资料并同步后端 ──
 	async function saveProfile() {
-		const nickName = editNickname.value || userInfo.value.nickname
-		const avatarUrl = userInfo.value.avatar
+		const nickName = editNickname.value
+		const avatarUrl = editAvatar.value
+
+		// 至少填写一项
 		if (!nickName && !avatarUrl) {
-			uni.showToast({ title: '请填写头像或昵称', icon: 'none' })
+			uni.showToast({ title: '请上传头像或填写昵称', icon: 'none' })
 			return
 		}
-		userInfo.value.nickname = nickName || '微信用户'
-		uni.setStorageSync('wxUserInfo', { nickName, avatarUrl })
-		showEditPanel.value = false
 
-		// 同步到后端
-		const token = uni.getStorageSync('token')
-		if (token && avatarUrl) {
-			try {
-				await api.updateXcxProfile({
-					nickName,
-					avatarUrl,
-					gender: 0,
-					country: '',
-					province: '',
-					city: '',
-					language: 'zh_CN',
-				})
-				uni.showToast({ title: '资料已更新', icon: 'success' })
-			} catch (e) {
-				console.error('[Profile] 更新后端失败:', e.message)
-				uni.showToast({ title: '本地已保存', icon: 'success' })
-			}
-		} else {
-			uni.showToast({ title: '已保存', icon: 'success' })
+		uni.showLoading({ title: '保存中...', mask: true })
+		try {
+			// avatarUrl 去掉 BASE_URL 前缀，只存相对路径给后端
+			const relativeAvatar = avatarUrl && avatarUrl.startsWith(BASE_URL)
+				? avatarUrl.replace(BASE_URL, '')
+				: avatarUrl
+
+			await api.updateXcxProfile({
+				nickName: nickName || '',
+				avatarUrl: relativeAvatar || '',
+			})
+
+			// 保存成功后从后端刷新最新资料
+			await userStore.fetchMemberInfo()
+			userInfo.value.nickname = userStore.userInfo.nickname
+			userInfo.value.avatar = avatarFullUrl(userStore.userInfo.avatar)
+
+			showEditPanel.value = false
+			uni.hideLoading()
+			uni.showToast({ title: '资料已更新', icon: 'success' })
+		} catch (e) {
+			console.error('[Profile] 保存失败:', e.message)
+			uni.hideLoading()
+			uni.showToast({ title: '保存失败，请重试', icon: 'none' })
 		}
 	}
 
@@ -557,6 +600,7 @@
 	.avatar-img {
 		width: 100%;
 		height: 100%;
+		border-radius: 50%;
 	}
 
 	.avatar-default {
@@ -782,8 +826,13 @@
 	}
 
 	@keyframes edit-slide-up {
-		from { transform: translateY(100%); }
-		to { transform: translateY(0); }
+		from {
+			transform: translateY(100%);
+		}
+
+		to {
+			transform: translateY(0);
+		}
 	}
 
 	.edit-header {
@@ -902,9 +951,9 @@
 		left: 50%;
 		transform: translateX(-50%);
 		font-size: 10px;
-		color: rgba(255,255,255,0.9);
+		color: rgba(255, 255, 255, 0.9);
 		white-space: nowrap;
-		background: rgba(0,0,0,0.3);
+		background: rgba(0, 0, 0, 0.3);
 		padding: 2px 8px;
 		border-radius: 8px;
 	}
