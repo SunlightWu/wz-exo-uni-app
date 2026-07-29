@@ -18,7 +18,7 @@
 				<!-- 用户信息 -->
 				<view class="user-header">
 					<view class="avatar-box" @click="onAvatarTap">
-						<image v-if="userInfo.avatar" class="avatar-img" :src="userInfo.avatar" mode="aspectFill">
+						<image v-if="userInfo.avatar" class="avatar-img" :src="BASE_URL + userInfo.avatar" mode="aspectFill">
 						</image>
 						<view v-else class="avatar-default">
 							<u-icon name="account-fill" color="$primaryColor" size="32"></u-icon>
@@ -173,7 +173,7 @@
 				<view class="edit-body">
 					<!-- 头像选择 -->
 					<button class="edit-avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
-						<image v-if="editAvatar" class="edit-avatar-img" :src="editAvatar"
+						<image v-if="editAvatar" class="edit-avatar-img" :src="BASE_URL + editAvatar"
 							mode="aspectFill"></image>
 						<view v-else class="edit-avatar-placeholder">
 							<u-icon name="plus" color="$primaryColor" size="24"></u-icon>
@@ -209,10 +209,6 @@
 	} from '../../services/api.js';
 
 	const userStore = useUserStore();
-	// 头像相对路径转完整 URL
-	function avatarFullUrl(url) {
-		return url && !url.startsWith('http') ? `${BASE_URL}${url}` : (url || '')
-	}
 	const statusBarHeight = ref(20)
 	const userInfo = ref({
 		nickname: '微信用户',
@@ -345,7 +341,7 @@
 			console.log('[Avatar] 上传成功:', relativeUrl)
 
 			// 后端保存相对路径，前端拼接展示
-			editAvatar.value = `${BASE_URL}${relativeUrl}`
+			editAvatar.value = relativeUrl
 			uni.hideLoading()
 		} catch (err) {
 			console.error('[Avatar] 上传失败:', err.message || err)
@@ -396,7 +392,7 @@
 			// 保存成功后从后端刷新最新资料
 			await userStore.fetchMemberInfo()
 			userInfo.value.nickname = userStore.userInfo.nickname
-			userInfo.value.avatar = avatarFullUrl(userStore.userInfo.avatar)
+			userInfo.value.avatar = userStore.userInfo.avatar
 
 			showEditPanel.value = false
 			uni.hideLoading()
