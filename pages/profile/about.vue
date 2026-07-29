@@ -27,13 +27,13 @@
 				</view>
 			</view>
 			<view class="row-divider"></view>
-			<view class="info-row" @click="clearCache">
+			<!-- <view class="info-row" @click="clearCache">
 				<text class="info-label">清除缓存</text>
 				<view class="info-extra">
 					<text class="extra-text">{{ cacheSize }}</text>
 					<text class="info-arrow">›</text>
 				</view>
-			</view>
+			</view> -->
 		</view>
 
 		<!-- 公司信息 -->
