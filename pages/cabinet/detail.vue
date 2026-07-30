@@ -630,18 +630,8 @@
 
 				const success = await executePaymentFlow(tradeNo, depositMoney, riskAmount);
 				if (success) {
-					const d = {
-						deviceSn: dev.deviceSn,
-						hourlyRate: dev.hourlyRate || feeTemplate.hourlyRate || 0,
-						freeMinutes: dev.freeMinutes || feeTemplate.freeMinutes || 0,
-						depositMoney: dev.depositMoney || feeTemplate.depositMoney || 0,
-					};
-					const rate = d.hourlyRate;
-					const freeMin = d.freeMinutes;
-					const deposit = d.depositMoney;
-					const cabinetIdVal = cabinet.value.id || cabinet.value.cabinetNo || '';
 					uni.redirectTo({
-						url: `/pages/device/demo-control?tradeNo=${tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(dev.deviceName || '外骨骼设备')}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}&cabinetId=${cabinetIdVal}`
+						url: `/pages/device/demo-control?tradeNo=${tradeNo}`
 					});
 				}
 			} catch (e) {
@@ -714,12 +704,8 @@
 			const success = await executePaymentFlow(tradeNo, depositMoney, riskAmount);
 			if (success) {
 				// 4. 跳转到设备控制页
-				const rate = d.hourlyRate || feeTemplate.hourlyRate || 0;
-				const freeMin = d.freeMinutes || feeTemplate.freeMinutes || 0;
-				const deposit = d.depositMoney || feeTemplate.depositMoney || 0;
-				const cabinetIdVal = cabinet.value.id || cabinet.value.cabinetNo || '';
 				uni.redirectTo({
-					url: `/pages/device/demo-control?tradeNo=${tradeNo}&deviceSn=${d.deviceSn}&name=${encodeURIComponent(dev.deviceName || '外骨骼设备')}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}&cabinetId=${cabinetIdVal}`
+					url: `/pages/device/demo-control?tradeNo=${tradeNo}`
 				});
 			}
 		} catch (e) {

@@ -224,12 +224,8 @@ function onOrderClick(item) {
 	const status = item.status ?? item.state;
 	if (status === 1) {
 		// 租赁中 → 跳转到控制页继续体验
-		const rate = item.hourlyRate || 0;
-		const freeMin = item.freeMinutes || 0;
-		const deposit = item.depositMoney || 0;
-		const name = encodeURIComponent(item.deviceName || '外骨骼设备');
 		uni.navigateTo({
-			url: `/pages/device/demo-control?tradeNo=${item.tradeNo}&deviceSn=${item.deviceSn || ''}&name=${name}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}`
+			url: `/pages/device/demo-control?tradeNo=${item.tradeNo}`
 		});
 	} else {
 		// 其他状态 → 跳转到订单详情

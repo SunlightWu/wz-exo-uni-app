@@ -1,42 +1,47 @@
 <template>
 	<view class="demo-page">
-		<!-- 顶部渐变背景区 -->
-		<view class="header-bg"></view>
+		<!-- 固定顶部：自定义导航栏（不随页面滚动） -->
+		<view class="fixed-nav" :style="{ paddingTop: statusBarHeight + 'px' }">
+			<view class="custom-nav">
+				<view class="nav-back" @click="onNavBack">
+					<u-icon name="arrow-left" color="#fff" size="20"></u-icon>
+				</view>
+				<text class="nav-title">{{ deviceName }}</text>
+				<view class="nav-placeholder"></view>
+			</view>
+		</view>
 
-		<!-- 大号计时器 -->
-		<view class="timer-card">
-			<view class="timer-ring">
-				<view class="timer-inner">
-					<text class="timer-label">使用时长</text>
-					<text class="timer-value">{{ formattedTime }}</text>
-					<view class="timer-status running">
+		<!-- 顶部通透渐变区（hero 计时器，跟随滚动） -->
+		<view class="hero-section" :style="{ marginTop: (statusBarHeight + 44) + 'px' }">
+			<!-- Hero 计时器卡片 -->
+			<view class="hero-card">
+				<view class="hero-top-row">
+					<view class="hero-status">
 						<view class="status-dot"></view>
 						<text class="status-text">运行中</text>
 					</view>
 				</view>
+				<text class="hero-timer">{{ formattedTime }}</text>
 			</view>
 		</view>
 
-		<!-- 设备信息卡 -->
-		<view class="info-card device-info-card">
-			<view class="card-header">
-				<u-icon name="setting-fill" color="#306afc" size="16"></u-icon>
+		<!-- 设备信息卡（顶部压在 hero 下方，形成堆叠） -->
+		<view class="info-card device-card">
+			<view class="card-title-row">
+				<view class="title-bar"></view>
 				<text class="card-title">设备信息</text>
 			</view>
-			<view class="device-info-body">
-				<view class="device-info-row">
-					<u-icon name="tags" color="#999" size="14"></u-icon>
-					<text class="device-info-label">设备编号</text>
-					<text class="device-info-value mono">{{ deviceSn || 'EXO-0000' }}</text>
+			<view class="device-rows">
+				<view class="device-row">
+					<text class="row-label">设备编号</text>
+					<text class="row-value mono">{{ deviceSn || 'EXO-0000' }}</text>
 				</view>
-				<view class="device-info-row">
-					<u-icon name="file-text" color="#999" size="14"></u-icon>
-					<text class="device-info-label">订单编号</text>
-					<text class="device-info-value mono">{{ tradeNo || '-' }}</text>
+				<view class="device-row">
+					<text class="row-label">订单编号</text>
+					<text class="row-value mono">{{ tradeNo || '-' }}</text>
 				</view>
-				<view class="device-info-row">
-					<u-icon name="battery-half" color="#999" size="14"></u-icon>
-					<text class="device-info-label">剩余电量</text>
+				<view class="device-row">
+					<text class="row-label">剩余电量</text>
 					<view class="battery-wrap">
 						<view class="battery-bar">
 							<view class="battery-fill" :style="{ width: batteryLevel + '%' }"></view>
@@ -47,74 +52,76 @@
 			</view>
 		</view>
 
-		<!-- 费用信息 -->
-		<view class="cost-card">
+		<!-- 费用信息卡 -->
+		<view class="info-card cost-card">
+			<view class="card-title-row">
+				<view class="title-bar"></view>
+				<text class="card-title">费用信息</text>
+			</view>
 			<view class="cost-row">
 				<view class="cost-item">
-					<view class="cost-icon-wrap" style="background: rgba(48,106,252,0.1);">
-						<u-icon name="rmb-circle-fill" color="#306afc" size="20"></u-icon>
-					</view>
-					<text class="cost-num cost-num-primary">¥{{ currentCost.toFixed(2) }}</text>
 					<text class="cost-label">当前费用</text>
+					<text class="cost-num cost-num-primary">¥{{ currentCost.toFixed(2) }}</text>
 				</view>
 				<view class="cost-divider"></view>
 				<view class="cost-item">
-					<view class="cost-icon-wrap" style="background: rgba(245,158,11,0.1);">
-						<u-icon name="clock-fill" color="#f59e0b" size="20"></u-icon>
-					</view>
-					<text class="cost-num">{{ formatMinutes(elapsedSeconds) }}</text>
-					<text class="cost-label">已用时长</text>
+					<text class="cost-label">{{ isFreePeriod ? '免费剩余' : '计费时长' }}</text>
+					<text class="cost-num" :class="isFreePeriod ? 'cost-num-free' : 'cost-num-bill'">
+						{{ isFreePeriod ? freeRemainingText : billableDurationText }}
+					</text>
 				</view>
 				<view class="cost-divider"></view>
 				<view class="cost-item">
-					<view class="cost-icon-wrap" style="background: rgba(139,92,246,0.1);">
-						<u-icon name="tags-fill" color="#8b5cf6" size="20"></u-icon>
-					</view>
-					<text class="cost-num">¥{{ (hourlyRate / 100).toFixed(2) }}/小时</text>
 					<text class="cost-label">费率</text>
+					<text class="cost-num cost-num-muted">¥{{ (hourlyRate / 100).toFixed(2) }}/时</text>
 				</view>
 			</view>
-			<!-- 计费进度条 -->
-			<!-- <view v-if="freeMinutes > 0" class="billing-progress">
-				<view class="progress-track">
-					<view class="progress-fill" :style="{ width: progressPercent + '%' }" :class="{ 'progress-paid': elapsedSeconds > freeMinutes * 60 }"></view>
+			<!-- 分段式计费进度 -->
+			<view v-if="freeMinutes > 0" class="phase-section">
+				<!-- 状态徽章 -->
+				<view class="phase-badge-row">
+					<view class="phase-badge" :class="isFreePeriod ? 'phase-badge-free' : 'phase-badge-bill'">
+						<view class="badge-dot" :class="isFreePeriod ? 'badge-dot-free' : 'badge-dot-bill'"></view>
+						<text>{{ isFreePeriod ? '免费中 · 剩余 ' + freeRemainingText : '计费中 · 已计费 ' + billableDurationText }}</text>
+					</view>
 				</view>
-				<view class="progress-labels">
-					<text class="progress-label" :class="{ 'progress-active': elapsedSeconds <= freeMinutes * 60 }">免费期</text>
-					<text class="progress-label" :class="{ 'progress-active': elapsedSeconds > freeMinutes * 60 }">计费期</text>
+				<!-- 分段进度条 -->
+				<view class="segment-bar">
+					<view class="segment segment-free">
+						<view class="segment-fill fill-free" :style="{ width: freeFillPercent + '%' }"></view>
+					</view>
+					<view class="segment segment-bill">
+						<view class="segment-fill fill-bill" :style="{ width: billFillPercent + '%' }"></view>
+					</view>
 				</view>
-			</view> -->
-			<view v-if="freeMinutes > 0" class="cost-hint">
-				<text v-if="elapsedSeconds <= freeMinutes * 60">免费剩余 {{ freeMinutes - Math.floor(elapsedSeconds / 60) }} 分钟</text>
-				<text v-else>已进入计费期，当前第 {{ billableHoursText }}</text>
-			</view>
-			<view v-if="elapsedSeconds > freeMinutes * 60" class="cost-hint cost-rule-hint">
-				<text>不足1小时按1小时计费</text>
+				<!-- 分段标签 -->
+				<view class="segment-labels">
+					<view class="seg-label">
+						<text class="seg-label-title" :class="{ 'active-free': isFreePeriod }">免费期</text>
+						<text class="seg-label-time">{{ freeMinutes }}分钟 · {{ isFreePeriod ? '已用 ' + freeUsedText : '已用完' }}</text>
+					</view>
+					<view class="seg-label">
+						<text class="seg-label-title" :class="{ 'active-bill': !isFreePeriod }">计费期</text>
+						<text class="seg-label-time">{{ !isFreePeriod ? '计费 ' + billableDurationText : '不足1小时按1小时计' }}</text>
+					</view>
+				</view>
 			</view>
 		</view>
 
-		<!-- 运动轨迹 -->
-		<view class="info-card">
-			<view class="card-header">
-				<u-icon name="map-fill" color="#306afc" size="16"></u-icon>
+		<!-- 运动轨迹卡（左移缩进，与费用卡形成 Z 字错位） -->
+		<view class="info-card track-card">
+			<view class="card-title-row">
+				<view class="title-bar"></view>
 				<text class="card-title">运动轨迹</text>
 			</view>
 			<view v-if="trajectoryPoints.length > 0">
 				<view class="track-map-wrap">
-					<map
-						id="trackMap"
-						class="track-map"
-						:latitude="trackCenter.lat"
-						:longitude="trackCenter.lng"
-						:scale="trackScale"
-						:polyline="polylineOption"
-						:markers="markersOption"
-						:include-points="includePointsOption"
-					></map>
+					<map id="trackMap" class="track-map" :latitude="trackCenter.lat" :longitude="trackCenter.lng"
+						:scale="trackScale" :polyline="polylineOption" :markers="markersOption"
+						:include-points="includePointsOption"></map>
 				</view>
 				<view class="track-stats">
 					<text class="track-stat">共 {{ trajectoryPoints.length }} 个轨迹点</text>
-					<!-- <text class="track-stat">已运动 {{ formatMinutes(elapsedSeconds) }}</text> -->
 				</view>
 			</view>
 			<view v-else class="track-empty">
@@ -122,14 +129,14 @@
 			</view>
 		</view>
 
-		<!-- 结束体验 -->
+		<!-- 底部结束按钮 -->
 		<view class="finish-section">
 			<view class="finish-btn" @click="onFinish">
 				<text>结束使用</text>
 			</view>
 		</view>
 
-		<view style="height: calc(30px + env(safe-area-inset-bottom));"></view>
+		<view class="safe-area-bottom"></view>
 	</view>
 </template>
 
@@ -173,15 +180,17 @@
 	const elapsedSeconds = ref(0);
 	const trajectoryPoints = ref([]);
 	const batteryLevel = ref(80); // 设备电量（模拟，后续可接入真实数据）
+	const statusBarHeight = ref(20);
 
 	const deviceStore = useDeviceStore();
 
 	let timer = null;
 	let trajTimer = null;
+	let refreshTimer = null;
+	let deviceInfoLoaded = false;
 
 	function initLeaseSession() {
 		if (deviceStore.leaseRunning && deviceStore.tradeNo === tradeNo.value) {
-			elapsedSeconds.value = Math.floor((Date.now() - deviceStore.leaseStartTime) / 1000);
 			startTimers();
 			collectLocation();
 			return;
@@ -191,13 +200,42 @@
 			tradeNo: tradeNo.value,
 			deviceSn: deviceSn.value,
 			deviceName: deviceName.value,
-			startTime: Date.now(),
+			startTime: Date.now() - elapsedSeconds.value * 1000,
 			rate: hourlyRate.value,
 			freeMinutes: freeMinutes.value,
 			deposit: depositMoney.value,
 		});
 		startTimers();
 		collectLocation();
+	}
+
+	// 调用接口获取设备租赁实时信息
+	async function loadLeaseDevice() {
+		if (!tradeNo.value) return;
+		try {
+			const res = await api.getLeaseDevice(tradeNo.value);
+			console.log('[DemoControl] 租赁设备信息:', res);
+			if ((res.code === 200 || res.code === 0) && res.data) {
+				const d = res.data;
+				deviceName.value = d.deviceName || '外骨骼设备';
+				deviceSn.value = d.deviceSn || '';
+				hourlyRate.value = d.hourlyRate || 0;
+				freeMinutes.value = d.freeMinutes || 0;
+				depositMoney.value = d.depositMoney || 0;
+				batteryLevel.value = d.batteryLevel ?? 80;
+				cabinetId.value = d.pickupCabinetId || '';
+				// 首次加载：基于 pickupTime 计算 elapsedSeconds
+				if (!deviceInfoLoaded && d.pickupTime) {
+					const startMs = parseDate(d.pickupTime).getTime();
+					if (!isNaN(startMs)) {
+						elapsedSeconds.value = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+					}
+				}
+				deviceInfoLoaded = true;
+			}
+		} catch (e) {
+			console.warn('[DemoControl] 获取设备信息失败:', e.message || e);
+		}
 	}
 
 	function startTimers() {
@@ -242,12 +280,44 @@
 	});
 
 	// 计费进度条百分比（以 2 倍免费时长为满格参考）
-	const progressPercent = computed(() => {
+	const isFreePeriod = computed(() => elapsedSeconds.value <= freeMinutes.value * 60);
+
+	// 免费段填充百分比
+	const freeFillPercent = computed(() => {
 		if (freeMinutes.value <= 0) return 0;
 		const freeSeconds = freeMinutes.value * 60;
-		const maxSeconds = freeSeconds * 2; // 满格参考
-		const percent = (elapsedSeconds.value / maxSeconds) * 100;
+		const percent = (elapsedSeconds.value / freeSeconds) * 100;
 		return Math.min(percent, 100);
+	});
+
+	// 计费段填充百分比（以1小时为满格参考）
+	const billFillPercent = computed(() => {
+		const freeSeconds = freeMinutes.value * 60;
+		if (elapsedSeconds.value <= freeSeconds) return 0;
+		const billableSeconds = elapsedSeconds.value - freeSeconds;
+		const percent = (billableSeconds / 3600) * 100;
+		return Math.min(percent, 100);
+	});
+
+	// 免费剩余时长 MM:SS
+	const freeRemainingText = computed(() => {
+		const freeSeconds = freeMinutes.value * 60;
+		const remaining = Math.max(0, freeSeconds - elapsedSeconds.value);
+		return formatClock(remaining);
+	});
+
+	// 免费已用时长 MM:SS
+	const freeUsedText = computed(() => {
+		const freeSeconds = freeMinutes.value * 60;
+		const used = Math.min(elapsedSeconds.value, freeSeconds);
+		return formatClock(used);
+	});
+
+	// 计费时长 MM:SS
+	const billableDurationText = computed(() => {
+		const freeSeconds = freeMinutes.value * 60;
+		const billable = Math.max(0, elapsedSeconds.value - freeSeconds);
+		return formatClock(billable);
 	});
 
 	const formattedTime = computed(() => {
@@ -372,21 +442,38 @@
 		return `${m}分${s}秒`;
 	}
 
+	function formatClock(seconds) {
+		const m = Math.floor(seconds / 60);
+		const s = seconds % 60;
+		return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+	}
+
 	onMounted(async () => {
+		// 获取状态栏高度
+		const sys = await uni.getSystemInfo();
+		statusBarHeight.value = sys.statusBarHeight || 20;
+
 		const pages = getCurrentPages();
 		const page = pages[pages.length - 1];
 		const query = page.options || page.$page?.options || page.$route?.query || {};
-		deviceName.value = decodeURIComponent(query.name || '') || '外骨骼设备';
-		uni.setNavigationBarTitle({ title: deviceName.value });
 		tradeNo.value = query.tradeNo || '';
-		deviceSn.value = query.deviceSn || '';
-		cabinetId.value = query.cabinetId || '';
-		hourlyRate.value = parseInt(query.hourlyRate) || 0;
-		freeMinutes.value = parseInt(query.freeMinutes) || 0;
-		depositMoney.value = parseInt(query.depositMoney) || 0;
 
-		// 并行加载历史轨迹和初始化租赁会话
-		await Promise.all([loadExistingTrajectory(), Promise.resolve().then(() => initLeaseSession())]);
+		if (!tradeNo.value) {
+			uni.showToast({ title: '缺少订单号', icon: 'none' });
+			return;
+		}
+
+		// 调用接口获取设备租赁实时信息
+		await loadLeaseDevice();
+
+		// 初始化租赁会话（启动计时器、定位上报）
+		initLeaseSession();
+
+		// 加载历史轨迹
+		await loadExistingTrajectory();
+
+		// 定时刷新设备信息（电量、费用同步）
+		refreshTimer = setInterval(loadLeaseDevice, 30000);
 	});
 
 	onUnmounted(() => {
@@ -401,6 +488,10 @@
 		if (trajTimer) {
 			clearInterval(trajTimer);
 			trajTimer = null;
+		}
+		if (refreshTimer) {
+			clearInterval(refreshTimer);
+			refreshTimer = null;
 		}
 	}
 
@@ -498,6 +589,10 @@
 			&& Number(a.longitude).toFixed(6) === Number(b.longitude).toFixed(6);
 	}
 
+	function onNavBack() {
+		uni.switchTab({ url: '/pages/index/index' });
+	}
+
 	function onFinish() {
 		const minutes = Math.floor(elapsedSeconds.value / 60);
 		const cost = currentCost.value;
@@ -530,9 +625,9 @@
 					// 调用真实归还接口
 					if (deviceSn.value) {
 						const res = await api.returnDevice(deviceSn.value, returnParams);
-						console.log(res,'===');
-							// 跳转到费用确认页（关闭当前页，防止返回）
-						if(res.code === 200) {
+						console.log(res, '===');
+						// 跳转到费用确认页（关闭当前页，防止返回）
+						if (res.code === 200) {
 							// 停止所有定时器，清除租赁状态和定位去重
 							clearAllTimers();
 							deviceStore.endLease();
@@ -541,20 +636,20 @@
 								url: `/pages/device/completed?tradeNo=${res.data.tradeNo}&duration=${elapsedSeconds.value}`,
 							});
 							uni.hideLoading();
-						}else {
+						} else {
 							uni.showToast({
 								title: res.msg || '归还失败',
 								icon: 'none'
 							});
 						}
 					}
-					
+
 				} catch (e) {
 					uni.showToast({
 						title: e.message || '归还失败',
 						icon: 'none'
 					});
-				} 
+				}
 			},
 		});
 	}
@@ -569,92 +664,86 @@
 <style scoped lang="scss">
 	.demo-page {
 		min-height: 100vh;
-		background: #f5f6fa;
-		padding: 16px;
+		background: $pageBg;
 		position: relative;
 		overflow: hidden;
 	}
 
-	/* 顶部渐变背景 */
-	.header-bg {
-		position: absolute;
+	/* ── 固定顶部导航栏（不随页面滚动） ── */
+	.fixed-nav {
+		position: fixed;
 		top: 0;
 		left: 0;
 		right: 0;
-		height: 200px;
-		background: linear-gradient(180deg, rgba(48, 106, 252, 0.08) 0%, transparent 100%);
-		z-index: 0;
-		pointer-events: none;
+		z-index: 100;
+		background: linear-gradient(180deg, #306afc 0%, #5d8eff 100%);
 	}
 
-	/* 大号计时器 */
-	.timer-card {
+	/* ── 顶部通透渐变区（从导航栏底部色平滑过渡到页面背景） ── */
+	.hero-section {
 		position: relative;
+		background: linear-gradient(180deg, #5d8eff 0%, #8eb0ff 40%, #f0f4fa 100%);
+		padding: 0 16px;
+		z-index: 2;
+	}
+
+	/* 自定义导航栏 */
+	.custom-nav {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		height: 44px;
+		position: relative;
+		z-index: 3;
+	}
+
+	.nav-back {
+		width: 44px;
+		height: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.nav-back:active {
+		opacity: 0.6;
+	}
+
+	.nav-title {
+		font-size: 17px;
+		font-weight: 700;
+		color: #fff;
+		flex: 1;
+		text-align: center;
+	}
+
+	.nav-placeholder {
+		width: 44px;
+		flex-shrink: 0;
+	}
+
+	/* ── Hero 计时器卡片 ── */
+	.hero-card {
+		position: relative;
+		padding: 20px 0px 44px;
 		z-index: 1;
-		background: linear-gradient(180deg, #fff 0%, #f8faff 100%);
-		border-radius: 20px;
-		padding: 24px;
-		margin-bottom: 16px;
-		display: flex;
-		justify-content: center;
-		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 	}
 
-	.timer-ring {
-		width: 220px;
-		height: 220px;
-		border-radius: 50%;
-		border: 3px solid #f0f0f0;
+	/* 顶部运行中状态 */
+	.hero-top-row {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		position: relative;
+		justify-content: flex-end;
+		margin-bottom: 12px;
 	}
 
-	.timer-ring::before {
-		content: '';
-		position: absolute;
-		inset: -3px;
-		border-radius: 50%;
-		border: 3px solid transparent;
-		border-top-color: $primaryColor;
-		border-right-color: $primaryColor;
-		animation: ring-rotate 3s linear infinite;
-	}
-
-	@keyframes ring-rotate {
-		from { transform: rotate(0deg); }
-		to { transform: rotate(360deg); }
-	}
-
-	.timer-inner {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 4px;
-	}
-
-	.timer-label {
-		font-size: 12px;
-		color: #999;
-		font-weight: 600;
-	}
-
-	.timer-value {
-		font-size: 42px;
-		font-weight: 900;
-		color: $primaryColor;
-		font-variant-numeric: tabular-nums;
-		letter-spacing: 2px;
-	}
-
-	.timer-status {
+	.hero-status {
 		display: flex;
 		align-items: center;
-		gap: 5px;
+		gap: 6px;
 		padding: 4px 12px;
 		border-radius: 999px;
-		background: rgba(48, 106, 252, 0.08);
+		background: rgba(255, 255, 255, 0.2);
 	}
 
 	.status-dot {
@@ -672,105 +761,126 @@
 
 	.status-text {
 		font-size: 12px;
-		color: $primaryColor;
+		color: #fff;
 		font-weight: 600;
 	}
 
-	/* 信息卡片 */
+	/* 居中大号计时器 */
+	.hero-timer {
+		display: block;
+		font-size: 48px;
+		font-weight: 900;
+		color: #fff;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 2px;
+		text-align: center;
+		line-height: 1.2;
+	}
+
+	/* ── 通用卡片 ── */
 	.info-card {
-		position: relative;
-		z-index: 1;
-		background: #fff;
-		border-radius: 16px;
-		padding: 14px 16px;
-		margin-bottom: 16px;
+		background: $cardBg;
+		border-radius: $radiusMd;
 		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+		padding: 16px;
+		position: relative;
+		z-index: 3;
 	}
 
-	.card-header {
+	/* 卡片标题行 */
+	.card-title-row {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		margin-bottom: 10px;
+		gap: 8px;
+		margin-bottom: 14px;
 	}
 
-	.card-title {
-		font-size: 15px;
-		font-weight: 800;
-		color: #333;
-	}
-
-	/* 设备信息卡 */
-	.device-info-body {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
-
-	.device-info-row {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-
-	.device-info-label {
-		font-size: 13px;
-		color: #999;
-		width: 60px;
+	.title-bar {
+		width: 4px;
+		height: 16px;
+		background: $primaryColor;
+		border-radius: 2px;
 		flex-shrink: 0;
 	}
 
-	.device-info-value {
-		font-size: 13px;
-		color: #333;
-		font-weight: 600;
-		flex: 1;
-		text-align: right;
+	.card-title {
+		font-size: 16px;
+		font-weight: 800;
+		color: $textMainColor;
 	}
 
-	.device-info-value.mono {
+	/* ── 设备信息卡（顶部压入 hero 下方） ── */
+	.device-card {
+		margin: -28px 16px 12px;
+		z-index: 4;
+		box-shadow: 0 4px 20px rgba(48, 106, 252, 0.1);
+	}
+
+	.device-rows {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.device-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		height: 44px;
+		border-bottom: 1px solid #f0f0f0;
+	}
+
+	.device-row:last-child {
+		border-bottom: none;
+	}
+
+	.row-label {
+		font-size: 13px;
+		color: $textSubColor;
+		font-weight: 600;
+	}
+
+	.row-value {
+		font-size: 14px;
+		color: $textMainColor;
+		font-weight: 700;
+	}
+
+	.row-value.mono {
 		font-family: monospace;
-		font-size: 12px;
+		font-size: 13px;
 	}
 
 	.battery-wrap {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		justify-content: flex-end;
-		flex: 1;
+		gap: 8px;
 	}
 
 	.battery-bar {
 		width: 60px;
-		height: 14px;
+		height: 12px;
 		background: #f0f0f0;
-		border-radius: 7px;
+		border-radius: 6px;
 		overflow: hidden;
 	}
 
 	.battery-fill {
 		height: 100%;
 		background: linear-gradient(90deg, #28c76f, #48e08a);
-		border-radius: 7px;
+		border-radius: 6px;
 		transition: width 0.3s ease;
 	}
 
 	.battery-text {
-		font-size: 12px;
-		color: #666;
-		font-weight: 600;
+		font-size: 13px;
+		color: $textMainColor;
+		font-weight: 700;
 	}
 
-	/* 费用卡片 */
+	/* ── 费用信息卡 ── */
 	.cost-card {
-		position: relative;
-		z-index: 1;
-		background: #fff;
-		border-radius: 16px;
-		padding: 18px;
-		margin-bottom: 16px;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+		margin: 0 16px 12px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 	}
 
 	.cost-row {
@@ -784,99 +894,189 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 6px;
-	}
-
-	.cost-icon-wrap {
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		flex: 1;
 	}
 
 	.cost-label {
-		font-size: 11px;
-		color: #999;
+		font-size: 12px;
+		color: $textSubColor;
+		font-weight: 600;
 	}
 
 	.cost-num {
 		font-size: 16px;
 		font-weight: 800;
-		color: #333;
+		color: $textMainColor;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.cost-num-primary {
 		color: $primaryColor;
-		font-size: 18px;
+		font-size: 22px;
+		font-weight: 900;
+	}
+
+	.cost-num-muted {
+		font-size: 14px;
+		color: $textSubColor;
+		font-weight: 700;
+	}
+
+	.cost-num-free {
+		color: #07c160;
+		font-size: 16px;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.cost-num-bill {
+		color: $primaryColor;
+		font-size: 16px;
+		font-weight: 800;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.cost-divider {
 		width: 1px;
-		height: 40px;
+		height: 36px;
 		background: #f0f0f0;
+		flex-shrink: 0;
 	}
 
-	/* 计费进度条 */
-	.billing-progress {
-		margin-top: 12px;
-		padding-top: 12px;
+	/* 分段式计费进度 */
+	.phase-section {
+		margin-top: 14px;
+		padding-top: 14px;
 		border-top: 1px solid #f5f6fa;
 	}
 
-	.progress-track {
-		width: 100%;
-		height: 8px;
-		background: #f0f0f0;
-		border-radius: 4px;
-		overflow: hidden;
+	.phase-badge-row {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 12px;
 	}
 
-	.progress-fill {
+	.phase-badge {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 5px 14px;
+		border-radius: 999px;
+		font-size: 13px;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.phase-badge-free {
+		background: rgba(7, 193, 96, 0.10);
+		color: #07c160;
+	}
+
+	.phase-badge-bill {
+		background: rgba(48, 106, 252, 0.10);
+		color: $primaryColor;
+	}
+
+	.badge-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+	}
+
+	.badge-dot-free {
+		background: #07c160;
+	}
+
+	.badge-dot-bill {
+		background: $primaryColor;
+	}
+
+	.segment-bar {
+		display: flex;
+		height: 10px;
+		border-radius: 5px;
+		overflow: hidden;
+		gap: 2px;
+		background: #f0f0f0;
+	}
+
+	.segment {
 		height: 100%;
-		background: linear-gradient(90deg, #28c76f, #07c160);
-		border-radius: 4px;
+		position: relative;
+		flex: 1;
+	}
+
+	.segment-free {
+		background: rgba(7, 193, 96, 0.12);
+	}
+
+	.segment-bill {
+		background: rgba(48, 106, 252, 0.12);
+	}
+
+	.segment-fill {
+		position: absolute;
+		top: 0;
+		left: 0;
+		height: 100%;
+		border-radius: 5px;
 		transition: width 0.5s ease;
 	}
 
-	.progress-fill.progress-paid {
-		background: linear-gradient(90deg, #306afc, #5d8eff);
+	.fill-free {
+		background: linear-gradient(90deg, #28c76f, #07c160);
 	}
 
-	.progress-labels {
+	.fill-bill {
+		background: linear-gradient(90deg, #5d8eff, #306afc);
+	}
+
+	.segment-labels {
 		display: flex;
-		justify-content: space-between;
-		margin-top: 6px;
+		margin-top: 8px;
 	}
 
-	.progress-label {
+	.seg-label {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2px;
+	}
+
+	.seg-label-title {
 		font-size: 11px;
+		font-weight: 600;
 		color: #bbb;
 	}
 
-	.progress-label.progress-active {
-		color: #333;
+	.seg-label-title.active-free {
+		color: #07c160;
 		font-weight: 700;
 	}
 
-	.cost-hint {
-		margin-top: 8px;
-		text-align: center;
-		font-size: 12px;
-		color: #28C76F;
+	.seg-label-title.active-bill {
+		color: $primaryColor;
+		font-weight: 700;
 	}
 
-	.cost-rule-hint {
-		padding-top: 4px;
-		color: #999;
+	.seg-label-time {
 		font-size: 11px;
+		color: $textSubColor;
+		font-variant-numeric: tabular-nums;
 	}
 
-	/* 轨迹地图 */
+	/* ── 运动轨迹卡 ── */
+	.track-card {
+		margin: 0 16px 12px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+	}
+
 	.track-map-wrap {
 		width: 100%;
 		height: 200px;
-		border-radius: 8px;
+		border-radius: 12px;
 		overflow: hidden;
 		margin-bottom: 8px;
 	}
@@ -888,12 +1088,13 @@
 
 	.track-stats {
 		display: flex;
-		justify-content: space-between;
+		justify-content: center;
 	}
 
 	.track-stat {
 		font-size: 12px;
-		color: #999;
+		color: $textSubColor;
+		font-weight: 600;
 	}
 
 	.track-empty {
@@ -908,20 +1109,17 @@
 		color: #ccc;
 	}
 
-	/* 结束按钮区域 */
+	/* ── 底部按钮 ── */
 	.finish-section {
+		margin: 0 16px 12px;
 		position: relative;
-		z-index: 1;
-		margin-top: 8px;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
+		z-index: 3;
 	}
 
 	.finish-btn {
 		width: 100%;
 		height: 52px;
-		background: linear-gradient(135deg, $primaryColor, $primaryLight);
+		background: $primaryColor;
 		border-radius: 12px;
 		display: flex;
 		align-items: center;
@@ -929,28 +1127,15 @@
 		font-size: 16px;
 		font-weight: 700;
 		color: #fff;
-		box-shadow: 0 4px 16px rgba(48, 106, 252, 0.3);
+		box-shadow: 0 4px 12px rgba(48, 106, 252, 0.3);
 	}
 
 	.finish-btn:active {
 		opacity: 0.85;
+		transform: scale(0.98);
 	}
 
-	.feedback-btn {
-		width: 100%;
-		height: 44px;
-		background: #fff;
-		border: 1px solid #e0e0e0;
-		border-radius: 12px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 14px;
-		font-weight: 600;
-		color: #666;
-	}
-
-	.feedback-btn:active {
-		background: #f8f8f8;
+	.safe-area-bottom {
+		height: calc(30px + env(safe-area-inset-bottom));
 	}
 </style>

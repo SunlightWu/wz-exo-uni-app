@@ -235,6 +235,7 @@ export const api = {
   depositConfirm: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/deposit-confirm`),
   settleOrder: (tradeNo) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/settle`),
   getLeaseStatusByTradeNo: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/status`),
+  getLeaseDevice: (tradeNo) => httpRequest('GET', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/device`),
   uploadTrajectory: (tradeNo, points) => httpRequest('POST', `${BASE_URL}/${API_PREFIX}mini/v1/lease/${tradeNo}/trajectory`, { points }),
 
   // ── 支付 ──

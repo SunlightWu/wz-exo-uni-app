@@ -773,13 +773,8 @@ import { parseDate } from '../../utils/format.js';
 	async function goToLeaseControl() {
 		if (!await ensurePhoneBound()) return;
 		if (!deviceStore.leaseRunning) return;
-		const sn = deviceStore.leaseDeviceSn || '';
-		const rate = deviceStore.leaseRate || 0;
-		const freeMin = deviceStore.leaseFreeMinutes || 0;
-		const deposit = deviceStore.leaseDeposit || 0;
-		const name = encodeURIComponent(deviceStore.deviceName || '外骨骼设备');
 		uni.navigateTo({
-			url: `/pages/device/demo-control?tradeNo=${deviceStore.tradeNo}&deviceSn=${sn}&name=${name}&hourlyRate=${rate}&freeMinutes=${freeMin}&depositMoney=${deposit}`
+			url: `/pages/device/demo-control?tradeNo=${deviceStore.tradeNo}`
 		});
 	}
 

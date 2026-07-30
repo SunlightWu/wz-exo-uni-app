@@ -46,7 +46,7 @@
 		{
 			"path": "pages/device/demo-control",
 			"style": {
-				"navigationBarTitleText": "设备体验"
+				"navigationStyle": "custom"
 			}
 		},
 		{
