@@ -117,14 +117,14 @@ async function onGetPhoneNumber(e) {
 		uni.showToast({ title: '手机号授权是使用租赁服务的必要条件', icon: 'none', duration: 2000 });
 		return;
 	}
-	if (!detail.encryptedData || !detail.iv) {
+	if (!detail.code) {
 		uni.showToast({ title: '授权信息获取失败，请重试', icon: 'none' });
 		return;
 	}
 
 	uni.showLoading({ title: '登录中...', mask: true });
 	try {
-		const success = await userStore.phoneLogin(detail.encryptedData, detail.iv);
+		const success = await userStore.phoneLogin(detail.code);
 		if (success) {
 			uni.hideLoading();
 			uni.showToast({ title: '登录成功', icon: 'success', duration: 1000 });

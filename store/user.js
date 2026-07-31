@@ -77,15 +77,14 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // ── 手机号授权登录 ──
-  async function phoneLogin(encryptedData, iv) {
+  async function phoneLogin(phoneCode) {
     try {
       const loginRes = await new Promise((resolve, reject) => {
         uni.login({ provider: 'weixin', success: resolve, fail: reject });
       });
       const result = await api.wxXcxAuthLogin({
         code: loginRes.code,
-        encryptedData,
-        iv,
+        phoneCode,
       });
       if (result.code === 200 && result.data) {
         persistAuth(result.data);
