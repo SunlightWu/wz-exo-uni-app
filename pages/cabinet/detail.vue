@@ -192,8 +192,10 @@
 				<!-- 支付分模式（默认） -->
 				<template v-if="payMode === 'payscore'">
 					<view class="confirm-btn payscore-btn" :class="{ disabled: !canConfirm }" @click="onConfirm">
-						<image v-if="selectedSlot" class="confirm-btn-icon" src="/static/payscore-logo.svg" mode="aspectFit"></image>
-						<text class="confirm-btn-text">{{ selectedSlot ? '微信支付分 | 550分及以上优享' : '请选择仓位' }}</text>
+						<image v-if="selectedSlot" class="confirm-btn-icon"
+							:src="canConfirm ? '/static/payscore-logo1.png' : '/static/payscore-logo2.png'"
+							mode="aspectFit"></image>
+						<text class="confirm-btn-text">{{ selectedSlot ? '微信支付分 | 650分及以上优享' : '请选择仓位' }}</text>
 					</view>
 					<view class="pay-mode-switch" @click="payMode = 'deposit'">
 						<text class="pay-mode-switch-text">支付分未通过？使用押金支付 ›</text>
@@ -201,7 +203,7 @@
 				</template>
 				<!-- 押金模式（降级） -->
 				<template v-else>
-					<view class="confirm-btn" :class="{ disabled: !canConfirm }" @click="onConfirm">
+					<view class="confirm-btn deposit-btn" :class="{ disabled: !canConfirm }" @click="onConfirm">
 						<text class="confirm-btn-text">{{ selectedSlot ? '确认租借' : '请选择仓位' }}</text>
 						<text v-if="selectedSlot" class="confirm-btn-sub">预付 ¥{{ actualDepositText }}</text>
 					</view>
@@ -235,7 +237,7 @@
 	const distance = ref('');
 	const selectedSlot = ref(null);
 	const agreed = ref(false);
-	const payMode = ref('deposit'); // 'payscore' | 'deposit'
+	const payMode = ref('payscore'); // 'payscore' | 'deposit'
 	const isContinuePay = ref(false);
 	const continueTradeNo = ref('');
 
@@ -530,14 +532,14 @@
 				openId,
 				description: '外骨骼租赁押金',
 			});
-			console.log('[PayScore] createPreAuthRisk:', riskRes);
-			if (!(riskRes.code === 200 || riskRes.code === 0) || !riskRes.data) {
-				uni.hideLoading();
-				await showCancelOption(tradeNo, riskRes.msg || '免押授权发起失败，是否取消订单？');
-				return false;
-			}
-			const riskData = riskRes.data;
-			const riskPayNo = riskData.payNo || '';
+			// console.log('[PayScore] createPreAuthRisk:', riskRes);
+			// if (!(riskRes.code === 200 || riskRes.code === 0) || !riskRes.data) {
+			// 	uni.hideLoading();
+			// 	await showCancelOption(tradeNo, riskRes.msg || '免押授权发起失败，是否取消订单？');
+			// 	return false;
+			// }
+			// const riskData = riskRes.data;
+			// const riskPayNo = riskData.payNo || '';
 
 			// 拉起微信支付分确认页
 			uni.hideLoading();
@@ -1290,6 +1292,13 @@
 		gap: 6px;
 	}
 
+	.confirm-btn.deposit-btn {
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+	}
+
 	.confirm-btn.disabled {
 		background: #d1d5db;
 		color: #fff;
@@ -1298,11 +1307,13 @@
 	.confirm-btn.payscore-btn {
 		background: linear-gradient(135deg, #07c160, #06ad56);
 		box-shadow: 0 4px 12px rgba(7, 193, 96, 0.3);
+		color: #ffffff;
 	}
 
 	.confirm-btn.payscore-btn.disabled {
 		background: #d1d5db;
 		box-shadow: none;
+		color: #666666;
 	}
 
 	.confirm-btn-icon {
@@ -1336,9 +1347,8 @@
 	}
 
 	.confirm-btn-sub {
-		font-size: 11px;
-		opacity: 0.85;
-		margin-top: 2px;
+		font-size: 12px;
+		opacity: 0.9;
 	}
 
 	/* ===== 模式切换 ===== */
