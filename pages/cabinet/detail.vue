@@ -235,7 +235,7 @@
 	const distance = ref('');
 	const selectedSlot = ref(null);
 	const agreed = ref(false);
-	const payMode = ref('payscore'); // 'payscore' | 'deposit'
+	const payMode = ref('deposit'); // 'payscore' | 'deposit'
 	const isContinuePay = ref(false);
 	const continueTradeNo = ref('');
 
@@ -1281,7 +1281,7 @@
 		justify-content: center;
 		gap: 1px;
 		color: #fff;
-		box-shadow: 0 4px 12px rgba(48, 106, 252, 0.3);
+		// box-shadow: 0 4px 12px rgba(48, 106, 252, 0.3);
 		transition: opacity 0.2s;
 	}
 
